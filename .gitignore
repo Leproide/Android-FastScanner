@@ -1,0 +1,10 @@
+# WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide
+.gradle/
+build/
+local.properties
+.idea/
+*.iml
+.DS_Store
+captures/
+*.keystore
+*.jks

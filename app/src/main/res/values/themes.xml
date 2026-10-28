@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<resources>
+    <style name="Theme.WebDavScanner" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/brand</item>
+        <item name="colorSecondary">@color/brand</item>
+    </style>
+</resources>

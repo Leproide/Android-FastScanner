@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WebDAV Scanner - static launcher shortcuts
+  Copyright (C) 2026 - License: GPL-3.0
+  Author: https://github.com/Leproide
+-->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_single"
+        android:shortcutId="scan_single"
+        android:shortcutShortLabel="@string/scan_single">
+        <intent
+            android:action="it.leproide.webdavscanner.SCAN_SINGLE"
+            android:targetClass="it.leproide.webdavscanner.MainActivity"
+            android:targetPackage="it.leproide.webdavscanner" />
+    </shortcut>
+    <shortcut
+        android:enabled="true"
+        android:icon="@drawable/ic_multi"
+        android:shortcutId="scan_multi"
+        android:shortcutShortLabel="@string/scan_multi">
+        <intent
+            android:action="it.leproide.webdavscanner.SCAN_MULTI"
+            android:targetClass="it.leproide.webdavscanner.MainActivity"
+            android:targetPackage="it.leproide.webdavscanner" />
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<resources>
+    <color name="brand">#1E5EFF</color>
+    <color name="brand_dark">#0B2E8A</color>
+    <color name="ic_bg">#1E5EFF</color>
+</resources>

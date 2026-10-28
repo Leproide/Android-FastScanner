@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical">
+
+    <com.google.android.material.appbar.MaterialToolbar android:id="@+id/toolbar"
+        android:layout_width="match_parent" android:layout_height="?attr/actionBarSize"
+        app:title="@string/app_name"/>
+
+<ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1"
+    android:clipToPadding="false">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:orientation="vertical" android:padding="16dp">
+
+        <TextView android:id="@+id/txtTarget" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginBottom="16dp"
+            android:textAppearance="?attr/textAppearanceBodyMedium"/>
+
+        <com.google.android.material.card.MaterialCardView android:id="@+id/cardSingle"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="12dp" android:clickable="true" android:focusable="true"
+            app:cardCornerRadius="16dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical" android:padding="24dp">
+                <ImageView android:layout_width="56dp" android:layout_height="56dp"
+                    android:src="@drawable/ic_single" android:importantForAccessibility="no"/>
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:layout_marginStart="16dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/scan_single" android:textAppearance="?attr/textAppearanceTitleLarge"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/scan_single_desc" android:textAppearance="?attr/textAppearanceBodyMedium"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <com.google.android.material.card.MaterialCardView android:id="@+id/cardMulti"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="24dp" android:clickable="true" android:focusable="true"
+            app:cardCornerRadius="16dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:orientation="horizontal" android:gravity="center_vertical" android:padding="24dp">
+                <ImageView android:layout_width="56dp" android:layout_height="56dp"
+                    android:src="@drawable/ic_multi" android:importantForAccessibility="no"/>
+                <LinearLayout android:layout_width="0dp" android:layout_height="wrap_content"
+                    android:layout_weight="1" android:layout_marginStart="16dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/scan_multi" android:textAppearance="?attr/textAppearanceTitleLarge"/>
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                        android:text="@string/scan_multi_desc" android:textAppearance="?attr/textAppearanceBodyMedium"/>
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:orientation="horizontal" android:gravity="center_vertical">
+            <TextView android:layout_width="0dp" android:layout_height="wrap_content" android:layout_weight="1"
+                android:text="@string/recent_uploads" android:textAppearance="?attr/textAppearanceTitleMedium"/>
+            <Button android:id="@+id/btnClear" style="@style/Widget.Material3.Button.TextButton"
+                android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:text="@string/clear_finished"/>
+        </LinearLayout>
+
+        <LinearLayout android:id="@+id/listUploads" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical"/>
+    </LinearLayout>
+</ScrollView>
+</LinearLayout>

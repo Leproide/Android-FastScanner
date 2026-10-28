@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  WebDAV Scanner - network security config
+  Copyright (C) 2026 - License: GPL-3.0
+  Author: https://github.com/Leproide
+
+  Cleartext (http) is allowed because many WebDAV servers live on a LAN/NAS.
+  User-installed CAs are trusted so a private CA can be used instead of the
+  "accept any certificate" option.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+            <certificates src="user" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>
