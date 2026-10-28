@@ -36,12 +36,33 @@ import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
+import javax.net.ssl.SSLHandshakeException
+import javax.net.ssl.SSLPeerUnverifiedException
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /** Thrown for HTTP errors; permanent = retrying will not help (auth, bad path...). */
 class WebDavException(val code: Int, res: Int, vararg args: Any?) :
     UploadException(res, permanent = code in 400..499 && code != 408 && code != 429, args = args.toList())
+
+/** Details of a server certificate shown to the user before trusting it. */
+data class CertInfo(
+    val sha256: String,
+    val subject: String,
+    val issuer: String,
+    val notAfter: java.util.Date,
+    val expired: Boolean,
+) {
+    val selfSigned: Boolean get() = subject == issuer
+}
+
+/** The pinned certificate differs from the one the server presented now. */
+class CertChangedException(val expected: String, val seen: CertInfo?, cause: Throwable?) :
+    UploadException(R.string.err_cert_changed, true, listOf(expected, seen?.sha256 ?: "?"), cause)
+
+/** TLS validation failed (self-signed, unknown CA, wrong host name) and no pin is configured. */
+class CertUntrustedException(cause: Throwable?) :
+    UploadException(R.string.err_cert_untrusted, true, listOf(cause?.message ?: ""), cause)
 
 /**
  * Minimal WebDAV client: PROPFIND (check), MKCOL (create dirs), PUT (upload).
@@ -51,14 +72,18 @@ class WebDavException(val code: Int, res: Int, vararg args: Any?) :
  * certificate is captured on "Test connection" and every later connection is
  * accepted ONLY if the certificate matches. No "trust everything" mode exists.
  *
- * @param capturePin true only for the settings test: accepts an unknown
- *                   certificate (when no pin is stored yet) and records it.
+ * Untrusted or changed certificates are never accepted silently: the settings
+ * screen shows them (see [probeCertificate]) and the user decides.
+ *
+ * @param capturePin true only for [probeCertificate]: accepts any certificate
+ *                   just to read it (no credentials are sent in that mode).
  */
 class WebDavClient(private val cfg: Config, private val capturePin: Boolean = false) {
 
-    /** Leaf fingerprint observed during the last handshake (pinning mode only). */
-    @Volatile var seenPin: String? = null
+    /** Leaf certificate observed during the last handshake (pinning mode only). */
+    @Volatile var seenCert: CertInfo? = null
         private set
+    val seenPin: String? get() = seenCert?.sha256
 
     /** Non-null when the server presented a certificate different from the pinned one. */
     @Volatile var pinMismatch: String? = null
@@ -99,9 +124,16 @@ class WebDavClient(private val cfg: Config, private val capturePin: Boolean = fa
             override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
                 if (chain.isEmpty()) throw CertificateException("Empty certificate chain")
                 val leaf = chain[0]
-                leaf.checkValidity() // still reject expired / not-yet-valid certificates
+                // Validity dates are NOT enforced: the exact certificate is pinned, and many
+                // NAS/routers ship long-expired self-signed certs. Expiry is shown to the user.
                 val pin = fingerprint(leaf)
-                seenPin = pin
+                seenCert = CertInfo(
+                    sha256 = pin,
+                    subject = leaf.subjectX500Principal.name,
+                    issuer = leaf.issuerX500Principal.name,
+                    notAfter = leaf.notAfter,
+                    expired = leaf.notAfter.before(java.util.Date()),
+                )
                 if (expected.isEmpty()) {
                     if (!capturePin) throw CertificateException("No pinned certificate")
                     return // first use, settings test: recorded in seenPin
@@ -137,9 +169,13 @@ class WebDavClient(private val cfg: Config, private val capturePin: Boolean = fa
             return http.newCall(req).execute().use(block)
         } catch (e: IOException) {
             if (e is UploadException) throw e
-            pinMismatch?.let { throw UploadException(R.string.err_cert_changed, true, listOf(cfg.certPin, it), e) }
+            if (pinMismatch != null) throw CertChangedException(cfg.certPin, seenCert, e)
             if (cfg.trustAll && cfg.certPin.isEmpty() && !capturePin) {
                 throw UploadException(R.string.err_cert_pin_missing, true, cause = e)
+            }
+            // Standard validation failed: self-signed / private CA / host name mismatch.
+            if (!cfg.trustAll && (e is SSLHandshakeException || e is SSLPeerUnverifiedException)) {
+                throw CertUntrustedException(e)
             }
             throw UploadException(R.string.err_network, false, listOf(e.message ?: e.javaClass.simpleName), e)
         }
@@ -207,6 +243,20 @@ class WebDavClient(private val cfg: Config, private val capturePin: Boolean = fa
     companion object {
         private const val PROPFIND_BODY =
             "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>"
+
+        /**
+         * Reads the server certificate WITHOUT trusting it and WITHOUT sending
+         * credentials (a single anonymous OPTIONS request), so the user can decide.
+         */
+        fun probeCertificate(cfg: Config): CertInfo? {
+            val anon = cfg.copy(username = "", password = "", trustAll = true, certPin = "")
+            val c = WebDavClient(anon, capturePin = true)
+            runCatching {
+                val req = Request.Builder().url(baseServerUrl(anon)).method("OPTIONS", null).build()
+                c.http.newCall(req).execute().close()
+            }
+            return c.seenCert
+        }
 
         /** SHA-256 of the DER certificate, uppercase hex with ':' separators. */
         fun fingerprint(cert: X509Certificate): String =

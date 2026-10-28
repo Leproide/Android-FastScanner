@@ -47,7 +47,7 @@ Use **Prova connessione** to verify credentials and create the folder.
 ## Security notes
 
 - Passwords (WebDAV and SMB) are encrypted with an AES-256-GCM key stored in the Android Keystore; backup and device-to-device transfer are disabled.
-- No "trust all certificates" mode: self-signed WebDAV servers use certificate pinning; a changed certificate is rejected and reported.
+- No "trust all certificates" mode. Self-signed / local https servers (NAS, routers, IP addresses): *Test connection* shows the certificate (subject, issuer, expiry, SHA-256) and lets you trust it; it is then pinned. If the certificate changes (e.g. renewal), uploads stop and *Test connection* shows old/new fingerprints so you can accept the new one. The certificate probe sends no credentials.
 - HTTP redirects are not followed, so credentials are never sent to another host.
 - `http://` with credentials requires explicit confirmation (Basic auth would travel in clear text).
 - SMB: SMB1 disabled, signing required by default, optional mandatory SMB3 encryption.

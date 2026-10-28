@@ -27,7 +27,7 @@
     <string name="username">Username</string>
     <string name="password">Password</string>
     <string name="trust_all">Trust this server\'s self-signed certificate</string>
-    <string name="trust_all_desc">Certificate pinning: the fingerprint is saved on the first \"Test connection\"; any other certificate will be rejected</string>
+    <string name="trust_all_desc">Certificate pinning: only the accepted certificate is allowed. \"Test connection\" shows untrusted or changed certificates and lets you accept them.</string>
     <string name="section_output">Output</string>
     <string name="format">File format</string>
     <string name="format_pdf" translatable="false">PDF</string>
@@ -74,8 +74,8 @@
     <string name="err_bad_path">Invalid path: \'.\' and \'..\' are not allowed</string>
     <string name="err_network">Network error: %1$s</string>
     <string name="err_cert_pin_missing">Self-signed certificate not trusted yet: run \"Test connection\" in settings</string>
-    <string name="err_cert_changed">The server certificate has CHANGED (possible attack). Pinned: %1$s — received: %2$s. If the change is legitimate, turn the self-signed option off and on again, then run \"Test connection\".</string>
-    <string name="cert_trusted">Certificate pinned (SHA-256) — verify it matches the server, then Save:\n%1$s</string>
+    <string name="err_cert_changed">The server certificate has CHANGED. Pinned: %1$s — received: %2$s. Open Settings → Test connection to review and accept the new one.</string>
+    <string name="cert_trusted">Certificate accepted (SHA-256), tap Save to keep it:\n%1$s</string>
     <string name="err_smb_no_encryption">The server does not support SMB3 encryption</string>
     <string name="err_smb_not_disk">\'%1$s\' is not a shared folder</string>
     <string name="err_smb_login">SMB login failed: wrong user, password or domain</string>
@@ -96,4 +96,15 @@
     <string name="open_github" translatable="false">GitHub</string>
     <string name="credits_footer">FastScanner %1$s · by Leproide · GitHub</string>
     <string name="about_html"><![CDATA[<b>FastScanner</b> %1$s<br/>Document scanner with direct upload to WebDAV or SMB.<br/><br/><b>Author</b><br/>Leproide — <a href=\"%2$s\">%2$s</a><br/><br/><b>License</b><br/>GNU General Public License v3.0<br/><br/><b>Third-party components</b><br/>• Google ML Kit Document Scanner<br/>• smbj — Apache License 2.0<br/>• OkHttp — Apache License 2.0<br/>• Bouncy Castle — MIT License<br/>• AndroidX, Material Components, Kotlin coroutines — Apache License 2.0]]></string>
+    <string name="err_cert_untrusted">Certificate not trusted (self-signed, private CA or IP address): %1$s</string>
+    <string name="err_no_certificate">Could not read the server certificate (is it https?)</string>
+    <string name="cert_title_untrusted">Untrusted certificate</string>
+    <string name="cert_title_changed">Certificate changed</string>
+    <string name="cert_intro_untrusted">The server uses a certificate the system does not trust (typical of NAS, routers and local https servers).</string>
+    <string name="cert_intro_changed">The server presents a DIFFERENT certificate from the accepted one (previous: %1$s). This is normal after a renewal, but it can also be an interception attempt.</string>
+    <string name="cert_details">%1$s\n\nSubject: %2$s\nIssuer: %3$s\nExpires: %4$s\n\nSHA-256:\n%5$s\n\nAccept only if you recognise this server.</string>
+    <string name="cert_self_signed">self-signed</string>
+    <string name="cert_expired">(EXPIRED)</string>
+    <string name="cert_accept">Trust certificate</string>
+    <string name="cert_accept_new">Accept new certificate</string>
 </resources>

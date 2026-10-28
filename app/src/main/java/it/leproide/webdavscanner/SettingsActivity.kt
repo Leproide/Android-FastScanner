@@ -78,6 +78,9 @@ class SettingsActivity : AppCompatActivity() {
     /** Pinned WebDAV certificate (SHA-256); captured by "Test connection". */
     private var certPin = ""
 
+    /** false while the code itself flips the self-signed switch (keeps the new pin). */
+    private var pinResetEnabled = true
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
         super.onCreate(savedInstanceState)
@@ -123,7 +126,9 @@ class SettingsActivity : AppCompatActivity() {
         updateSections()
 
         // Toggling the self-signed option (or changing server) forgets the pinned certificate.
-        swTrustAll.setOnCheckedChangeListener { _, _ -> certPin = ""; txtResult.text = "" }
+        swTrustAll.setOnCheckedChangeListener { _, _ ->
+            if (pinResetEnabled) { certPin = ""; txtResult.text = "" }
+        }
 
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             val cfg = readForm() ?: return@setOnClickListener
@@ -304,27 +309,79 @@ class SettingsActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Strict test (no silent trust). If the server certificate is untrusted
+     * (self-signed / private CA / IP address) or differs from the pinned one,
+     * the user sees its details and can accept it; the test then re-runs.
+     */
     private fun testConnection() {
         val cfg = readForm() ?: return
         txtResult.text = getString(R.string.testing)
         lifecycleScope.launch {
-            val msg = withContext(Dispatchers.IO) {
-                // capturePin: a self-signed certificate seen for the first time is recorded.
-                val up = Uploader.forConfig(cfg, capturePin = true)
+            // Pinning enabled but nothing pinned yet: show the certificate first.
+            if (cfg.protocol == Protocol.WEBDAV && cfg.trustAll && cfg.certPin.isEmpty()) {
+                val info = withContext(Dispatchers.IO) { WebDavClient.probeCertificate(cfg) }
+                if (info == null) {
+                    txtResult.text = getString(R.string.test_fail, getString(R.string.err_no_certificate))
+                } else askTrust(info, null)
+                return@launch
+            }
+            val error: Exception? = withContext(Dispatchers.IO) {
                 try {
-                    val dest = up.use { it.test() }
-                    val ok = getString(R.string.test_ok, dest)
-                    val seen = (up as? WebDavUploader)?.client?.seenPin
-                    if (cfg.protocol == Protocol.WEBDAV && cfg.trustAll && seen != null) {
-                        val isNew = cfg.certPin.isEmpty()
-                        withContext(Dispatchers.Main) { certPin = seen }
-                        if (isNew) ok + "\n\n" + getString(R.string.cert_trusted, seen) else ok
-                    } else ok
+                    Uploader.forConfig(cfg).use { it.test() }
+                    null
                 } catch (e: Exception) {
-                    getString(R.string.test_fail, e.userMessage(this@SettingsActivity))
+                    e
                 }
             }
-            txtResult.text = msg
+            when (error) {
+                null -> {
+                    val dest = runCatching { Uploader.describe(cfg) }.getOrDefault("")
+                    txtResult.text = getString(R.string.test_ok, dest)
+                }
+                is CertChangedException -> {
+                    txtResult.text = getString(R.string.test_fail, error.localized(this@SettingsActivity))
+                    val info = error.seen ?: withContext(Dispatchers.IO) { WebDavClient.probeCertificate(cfg) }
+                    if (info != null) askTrust(info, error.expected)
+                }
+                is CertUntrustedException -> {
+                    txtResult.text = getString(R.string.test_fail, error.localized(this@SettingsActivity))
+                    val info = withContext(Dispatchers.IO) { WebDavClient.probeCertificate(cfg) }
+                    if (info != null) askTrust(info, null)
+                }
+                else -> txtResult.text = getString(R.string.test_fail, error.userMessage(this@SettingsActivity))
+            }
         }
+    }
+
+    /**
+     * Shows certificate details; on accept pins it (enabling the self-signed
+     * option if needed) and re-runs the test. [oldPin] != null = certificate changed.
+     */
+    private fun askTrust(info: CertInfo, oldPin: String?) {
+        val df = java.text.DateFormat.getDateInstance(java.text.DateFormat.MEDIUM)
+        val intro = if (oldPin == null) getString(R.string.cert_intro_untrusted)
+        else getString(R.string.cert_intro_changed, oldPin)
+        val body = getString(
+            R.string.cert_details,
+            intro,
+            info.subject,
+            if (info.selfSigned) getString(R.string.cert_self_signed) else info.issuer,
+            df.format(info.notAfter) + if (info.expired) " " + getString(R.string.cert_expired) else "",
+            info.sha256,
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(if (oldPin == null) R.string.cert_title_untrusted else R.string.cert_title_changed)
+            .setMessage(body)
+            .setPositiveButton(if (oldPin == null) R.string.cert_accept else R.string.cert_accept_new) { _, _ ->
+                pinResetEnabled = false
+                swTrustAll.isChecked = true
+                pinResetEnabled = true
+                certPin = info.sha256
+                txtResult.text = getString(R.string.cert_trusted, info.sha256)
+                testConnection() // verify with the pinned certificate
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 }

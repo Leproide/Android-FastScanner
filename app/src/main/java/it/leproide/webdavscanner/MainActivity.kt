@@ -314,7 +314,14 @@ class MainActivity : AppCompatActivity() {
                 WorkInfo.State.CANCELLED -> getString(R.string.state_cancelled)
                 WorkInfo.State.BLOCKED -> getString(R.string.state_enqueued)
             }
-            listUploads.addView(row("$label\n$state"))
+            listUploads.addView(row("$label\n$state").apply {
+                if (info.state == WorkInfo.State.FAILED) {
+                    // Failed (e.g. certificate changed, wrong password): fix it in settings.
+                    background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+                        .let { a -> a.getDrawable(0).also { a.recycle() } }
+                    setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+                }
+            })
         }
     }
 

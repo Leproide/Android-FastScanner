@@ -72,9 +72,8 @@ interface Uploader : Closeable {
     }
 
     companion object {
-        /** [capturePin] = settings test may record a new self-signed certificate. */
-        fun forConfig(cfg: Config, capturePin: Boolean = false): Uploader = when (cfg.protocol) {
-            Protocol.WEBDAV -> WebDavUploader(cfg, capturePin)
+        fun forConfig(cfg: Config): Uploader = when (cfg.protocol) {
+            Protocol.WEBDAV -> WebDavUploader(cfg)
             Protocol.SMB -> SmbUploader(cfg)
         }
 
@@ -87,8 +86,8 @@ interface Uploader : Closeable {
 }
 
 /** Adapter: existing [WebDavClient] behind the [Uploader] interface. */
-class WebDavUploader(cfg: Config, capturePin: Boolean = false) : Uploader {
-    val client = WebDavClient(cfg, capturePin)
+class WebDavUploader(cfg: Config) : Uploader {
+    val client = WebDavClient(cfg)
     override val destination: String = client.baseUrl.toString()
     override fun prepare() = client.ensureDirectory()
     override fun upload(file: File, name: String, mime: String) {

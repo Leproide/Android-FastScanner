@@ -26,7 +26,7 @@
     <string name="username">Utente</string>
     <string name="password">Password</string>
     <string name="trust_all">Fidati del certificato autofirmato di questo server</string>
-    <string name="trust_all_desc">Pinning del certificato: l\'impronta viene salvata alla prima \"Prova connessione\"; qualsiasi altro certificato verrà rifiutato</string>
+    <string name="trust_all_desc">Pinning del certificato: è ammesso solo il certificato accettato. \"Prova connessione\" mostra i certificati non attendibili o cambiati e ti permette di accettarli.</string>
     <string name="section_output">Output</string>
     <string name="format">Formato file</string>
     <string name="prefix">Prefisso nome file</string>
@@ -69,8 +69,8 @@
     <string name="err_bad_path">Percorso non valido: \'.\' e \'..\' non sono ammessi</string>
     <string name="err_network">Errore di rete: %1$s</string>
     <string name="err_cert_pin_missing">Certificato autofirmato non ancora memorizzato: esegui \"Prova connessione\" nelle impostazioni</string>
-    <string name="err_cert_changed">Il certificato del server è CAMBIATO (possibile attacco). Memorizzato: %1$s — ricevuto: %2$s. Se il cambio è legittimo, disattiva e riattiva l\'opzione certificato autofirmato e poi esegui \"Prova connessione\".</string>
-    <string name="cert_trusted">Certificato memorizzato (SHA-256) — verifica che corrisponda al server, poi Salva:\n%1$s</string>
+    <string name="err_cert_changed">Il certificato del server è CAMBIATO. Memorizzato: %1$s — ricevuto: %2$s. Apri Impostazioni → Prova connessione per verificarlo e accettare quello nuovo.</string>
+    <string name="cert_trusted">Certificato accettato (SHA-256), tocca Salva per memorizzarlo:\n%1$s</string>
     <string name="err_smb_no_encryption">Il server non supporta la crittografia SMB3</string>
     <string name="err_smb_not_disk">\'%1$s\' non è una cartella condivisa</string>
     <string name="err_smb_login">Login SMB fallito: utente, password o dominio errati</string>
@@ -90,4 +90,15 @@
     <string name="about">Informazioni</string>
     <string name="credits_footer">FastScanner %1$s · di Leproide · GitHub</string>
     <string name="about_html"><![CDATA[<b>FastScanner</b> %1$s<br/>Scanner di documenti con caricamento diretto su WebDAV o SMB.<br/><br/><b>Autore</b><br/>Leproide — <a href=\"%2$s\">%2$s</a><br/><br/><b>Licenza</b><br/>GNU General Public License v3.0<br/><br/><b>Componenti di terze parti</b><br/>• Google ML Kit Document Scanner<br/>• smbj — Apache License 2.0<br/>• OkHttp — Apache License 2.0<br/>• Bouncy Castle — MIT License<br/>• AndroidX, Material Components, Kotlin coroutines — Apache License 2.0]]></string>
+    <string name="err_cert_untrusted">Certificato non attendibile (autofirmato, CA privata o indirizzo IP): %1$s</string>
+    <string name="err_no_certificate">Impossibile leggere il certificato del server (è https?)</string>
+    <string name="cert_title_untrusted">Certificato non attendibile</string>
+    <string name="cert_title_changed">Certificato cambiato</string>
+    <string name="cert_intro_untrusted">Il server usa un certificato non riconosciuto dal sistema (tipico di NAS, router e server https locali).</string>
+    <string name="cert_intro_changed">Il server presenta un certificato DIVERSO da quello accettato (precedente: %1$s). È normale dopo un rinnovo, ma può anche essere un tentativo di intercettazione.</string>
+    <string name="cert_details">%1$s\n\nSoggetto: %2$s\nEmittente: %3$s\nScadenza: %4$s\n\nSHA-256:\n%5$s\n\nAccetta solo se riconosci questo server.</string>
+    <string name="cert_self_signed">autofirmato</string>
+    <string name="cert_expired">(SCADUTO)</string>
+    <string name="cert_accept">Fidati del certificato</string>
+    <string name="cert_accept_new">Accetta il nuovo certificato</string>
 </resources>
