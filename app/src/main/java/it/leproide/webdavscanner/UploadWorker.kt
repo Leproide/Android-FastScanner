@@ -63,19 +63,19 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                     f.delete()
                 }
                 jobDir.delete()
+                Prefs.setJobError(applicationContext, jobDir.name, null)
                 Result.success(workDataOf(KEY_RESULT to up.destination))
             }
         } catch (e: UploadException) {
             Log.w(TAG, "Upload failed", e)
-            if (e.permanent || runAttemptCount >= MAX_ATTEMPTS) fail(e.userMessage(applicationContext))
-            else Result.retry()
+            retryOrFail(jobDir, e, e.permanent)
         } catch (e: IOException) {
             // Network / TLS / timeout: transient unless we've tried too often.
             Log.w(TAG, "Upload I/O error", e)
-            if (runAttemptCount >= MAX_ATTEMPTS) fail(e.userMessage(applicationContext)) else Result.retry()
+            retryOrFail(jobDir, e, false)
         } catch (e: Exception) {
             Log.e(TAG, "Upload unexpected error", e)
-            fail(e.userMessage(applicationContext))
+            retryOrFail(jobDir, e, true)
         }
     }
 
@@ -100,6 +100,13 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
 
     private fun fail(msg: String) = Result.failure(workDataOf(KEY_ERROR to msg))
 
+    /** Remembers the error (shown in the list while retrying) and retries or fails. */
+    private fun retryOrFail(jobDir: File, e: Throwable, permanent: Boolean): Result {
+        val msg = e.userMessage(applicationContext)
+        Prefs.setJobError(applicationContext, jobDir.name, msg)
+        return if (permanent || runAttemptCount + 1 >= MAX_ATTEMPTS) fail(msg) else Result.retry()
+    }
+
     companion object {
         private const val TAG = "UploadWorker"
         const val WORK_TAG = "upload"
@@ -110,7 +117,8 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         const val KEY_PROGRESS = "progress"
         const val KEY_ERROR = "error"
         const val KEY_RESULT = "result"
-        private const val MAX_ATTEMPTS = 20
+        // 30s, 1m, 2m, 4m, 8m, 16m, 32m, 64m -> definitive failure after ~2 hours
+        private const val MAX_ATTEMPTS = 8
 
         /** Queues the upload of a prepared job directory. [label] is shown in the UI. */
         fun enqueue(ctx: Context, jobDir: File, label: String) {
@@ -119,7 +127,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 .setConstraints(
                     Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
                 )
-                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
+                .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 30, TimeUnit.SECONDS)
                 .addTag(WORK_TAG)
                 .addTag(LABEL_PREFIX + label)
                 .addTag(JOB_PREFIX + jobDir.name) // lets the UI retry / delete files of failed jobs

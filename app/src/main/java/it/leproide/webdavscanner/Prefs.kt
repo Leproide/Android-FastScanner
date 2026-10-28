@@ -139,6 +139,16 @@ object Prefs {
             .apply()
     }
 
+    /** Last error of a job (shown while it is retrying); null removes it. */
+    fun jobError(ctx: Context, jobId: String): String? =
+        ctx.getSharedPreferences("job_errors", Context.MODE_PRIVATE).getString(jobId, null)
+
+    fun setJobError(ctx: Context, jobId: String, msg: String?) {
+        ctx.getSharedPreferences("job_errors", Context.MODE_PRIVATE).edit().apply {
+            if (msg == null) remove(jobId) else putString(jobId, msg)
+        }.apply()
+    }
+
     /** Failed jobs the user removed from the list (their files are already deleted). */
     fun dismissedJobs(ctx: Context): Set<String> =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getStringSet("dismissed", emptySet()).orEmpty()

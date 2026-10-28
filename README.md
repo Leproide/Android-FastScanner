@@ -12,7 +12,7 @@ Android document scanner that uploads straight to a **WebDAV** server **or** an 
 - **Automatic file name**: `<prefix>yyyy-MM-dd_HH-mm-ss` (e.g. `scan_2026-10-28_15-47-12.pdf`).
   Two scans in the same second get `-2`, `-3`; the upload uses `If-None-Match: *` so an existing remote file is **never overwritten**.
 - **Output format** (settings): PDF, JPG, or both. Multi-page JPGs are named `..._01.jpg`, `..._02.jpg`.
-- **Reliable upload queue** (WorkManager): waits for network, retries with backoff, survives app close/reboot; live status on the main screen.
+- **Reliable upload queue** (WorkManager): waits for network, up to 8 automatic attempts (30 s → ~1 h backoff, ~2 h total), survives app close/reboot; live status with the last error; *Retry now* on retrying items, *Retry* on failed ones, *Retry all*.
 - **WebDAV**: server URL, port, remote folder (created automatically if missing), Basic auth, password encrypted with Android Keystore, optional **certificate pinning** for self-signed servers (trust-on-first-use, SHA-256), http allowed for LAN/NAS with an explicit warning.
 - **SMB2 / SMB3** (alternative to WebDAV, selected with a toggle in settings):
   - dialects SMB 3.1.1 → 2.0.2 only (SMB1 never used), message signing required by default, optional mandatory SMB3 AES encryption, optional DFS;

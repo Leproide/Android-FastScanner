@@ -74,10 +74,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnRetryAll: Button
 
     /** Failed jobs whose files are still on the phone: (jobId, label). */
-    private var retryable: List<Pair<String, String>> = emptyList()
+    private var retryable: List<Triple<String, String, WorkInfo>> = emptyList()
 
     /** Jobs currently queued or running (newest record not finished). */
     private var activeJobs: Set<String> = emptySet()
+
+    /** Jobs re-queued by the user since the last list refresh (double-tap guard). */
+    private var retriedNow: Set<String> = emptySet()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
@@ -102,7 +105,9 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.btnClear).setOnClickListener { clearFinished() }
         btnRetryAll = findViewById(R.id.btnRetryAll)
         btnRetryAll.setOnClickListener {
-            retryable.forEach { (job, label) -> retryJob(job, label) }
+            retryable.forEach { (job, label, info) ->
+                retryJob(job, label, info.takeIf { it.state == WorkInfo.State.ENQUEUED })
+            }
         }
         findViewById<TextView>(R.id.txtCredits).apply {
             val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: ""
@@ -274,15 +279,27 @@ class MainActivity : AppCompatActivity() {
                 Prefs.setDismissedJobs(this, Prefs.dismissedJobs(this) + jobId)
                 refreshUploads()
             }
-        if (hasFiles) b.setPositiveButton(R.string.retry) { _, _ -> retryJob(jobId, label) }
+        if (hasFiles) b.setPositiveButton(R.string.retry) { _, _ ->
+            retryJob(jobId, label, retryable.firstOrNull { it.first == jobId }?.third?.takeIf { it.state == WorkInfo.State.ENQUEUED })
+        }
         b.show()
     }
 
     /** Manual retry of a failed upload (files still on the phone). */
-    private fun retryJob(jobId: String, label: String) {
-        // Ignore double taps: the job is already queued/running again.
-        if (jobId in activeJobs || !Storage.jobHasFiles(this, jobId)) return
-        activeJobs = activeJobs + jobId
+    /**
+     * Manual retry. [waiting] = the job is in automatic retry (backoff): it is
+     * cancelled and re-queued to run immediately.
+     */
+    private fun retryJob(jobId: String, label: String, waiting: WorkInfo? = null) {
+        // Ignore double taps.
+        if (jobId in retriedNow || !Storage.jobHasFiles(this, jobId)) return
+        if (waiting == null && jobId in activeJobs) return
+        retriedNow = retriedNow + jobId
+        val wm = WorkManager.getInstance(this)
+        if (waiting != null) {
+            if (waiting.state != WorkInfo.State.ENQUEUED) return // running right now: let it finish
+            wm.cancelWorkById(waiting.id)
+        }
         UploadWorker.enqueue(this, Storage.jobDir(this, jobId), label)
         Toast.makeText(this, getString(R.string.queued, label), Toast.LENGTH_SHORT).show()
     }
@@ -367,19 +384,21 @@ class MainActivity : AppCompatActivity() {
             listUploads.addView(row(getString(R.string.pending_space, Formatter.formatShortFileSize(this, pending))))
         }
         activeJobs = items.filter { !it.third.state.isFinished }.map { it.first }.toSet()
-        retryable = items
-            .filter { it.third.state == WorkInfo.State.FAILED && Storage.jobHasFiles(this, it.first) }
-            .map { it.first to it.second }
+        retriedNow = emptySet()
+        retryable = items.filter { canRetry(it.third) && Storage.jobHasFiles(this, it.first) }
         btnRetryAll.visibility = if (retryable.size > 1) View.VISIBLE else View.GONE
         if (items.isEmpty()) {
             listUploads.addView(row(getString(R.string.no_uploads)))
             return
         }
         items.forEach { (job, label, info) ->
-            val error = info.outputData.getString(UploadWorker.KEY_ERROR)
+            // Final error (failed) or last attempt's error (automatic retry in progress).
+            val error = info.outputData.getString(UploadWorker.KEY_ERROR) ?: Prefs.jobError(this, job)
             val state = when (info.state) {
                 WorkInfo.State.ENQUEUED ->
-                    if (info.runAttemptCount > 0) getString(R.string.state_retry) else getString(R.string.state_enqueued)
+                    if (info.runAttemptCount > 0)
+                        getString(R.string.state_retry_n, info.runAttemptCount) + (error?.let { "\n$it" } ?: "")
+                    else getString(R.string.state_enqueued)
                 WorkInfo.State.RUNNING -> getString(R.string.state_running) +
                     (info.progress.getString(UploadWorker.KEY_PROGRESS)?.let { " $it" } ?: "")
                 WorkInfo.State.SUCCEEDED -> "✓ " + getString(R.string.state_succeeded)
@@ -389,11 +408,11 @@ class MainActivity : AppCompatActivity() {
                 WorkInfo.State.BLOCKED -> getString(R.string.state_enqueued)
             }
             val text = row("$label\n$state")
-            if (info.state != WorkInfo.State.FAILED) {
+            if (!canRetry(info)) {
                 listUploads.addView(text)
                 return@forEach
             }
-            // Failed: text opens the options dialog, visible "Retry" button when files are still here.
+            // Failed / retrying: text opens the options dialog, visible "Retry" button when files are still here.
             text.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
             text.background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
                 .let { a -> a.getDrawable(0).also { a.recycle() } }
@@ -406,14 +425,21 @@ class MainActivity : AppCompatActivity() {
             if (Storage.jobHasFiles(this, job)) {
                 line.addView(
                     MaterialButton(this).apply {
-                        setText(R.string.retry)
-                        setOnClickListener { retryJob(job, label) }
+                        setText(if (info.state == WorkInfo.State.FAILED) R.string.retry else R.string.retry_now)
+                        setOnClickListener {
+                            retryJob(job, label, info.takeIf { it.state == WorkInfo.State.ENQUEUED })
+                        }
                     }
                 )
             }
             listUploads.addView(line)
         }
     }
+
+    /** Failed, or waiting for the next automatic attempt after an error. */
+    private fun canRetry(info: WorkInfo) =
+        info.state == WorkInfo.State.FAILED ||
+            (info.state == WorkInfo.State.ENQUEUED && info.runAttemptCount > 0)
 
     private fun row(text: String) = TextView(this).apply {
         this.text = text

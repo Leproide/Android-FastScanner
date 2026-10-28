@@ -72,6 +72,7 @@ object Storage {
                 if (delete) {
                     Log.i(TAG, "Deleting local job ${dir.name}")
                     dir.deleteRecursively()
+                    Prefs.setJobError(ctx, dir.name, null)
                 }
             }
             deleteOlderThan(ctx.cacheDir, now - CACHE_MAX_AGE_MS)
@@ -81,6 +82,7 @@ object Storage {
     /** Deletes the local files of one job (user choice on a failed upload). */
     fun deleteJob(ctx: Context, jobId: String) {
         jobDir(ctx, jobId).deleteRecursively()
+        Prefs.setJobError(ctx, jobId, null)
     }
 
     fun jobHasFiles(ctx: Context, jobId: String): Boolean =

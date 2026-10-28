@@ -113,4 +113,6 @@
     <string name="failed_kept">The scan is still on the phone: you can retry after fixing the problem. It will be deleted automatically after %1$d days.</string>
     <string name="failed_gone">The scan is no longer on the phone (deleted after %1$d days or manually).</string>
     <string name="retry_all">Retry all</string>
+    <string name="retry_now">Retry now</string>
+    <string name="state_retry_n">Automatic retry (attempt %1$d)</string>
 </resources>

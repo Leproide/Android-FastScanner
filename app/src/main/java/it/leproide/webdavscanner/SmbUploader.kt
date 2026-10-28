@@ -156,9 +156,18 @@ class SmbUploader(private val cfg: Config) : Uploader {
         }
     } catch (e: SMBRuntimeException) {
         // Transport / protocol problems: usually transient (network drop, timeout).
-        throw UploadException(R.string.err_smb_generic, false, listOf(e.message ?: e.javaClass.simpleName), e)
+        throw UploadException(R.string.err_smb_generic, false, listOf(describe(e)), e)
     } catch (e: IOException) {
-        throw UploadException(R.string.err_network, false, listOf(e.message ?: e.javaClass.simpleName), e)
+        throw UploadException(R.string.err_network, false, listOf(describe(e)), e)
+    }
+
+    /** "Class: message" of the deepest cause, so the real reason (timeout, refused...) is visible. */
+    private fun describe(e: Throwable): String {
+        var c: Throwable = e
+        while (c.cause != null && c.cause !== c) c = c.cause!!
+        val top = e.message?.takeIf { it.isNotBlank() }
+        val root = "${c.javaClass.simpleName}: ${c.message ?: ""}".trimEnd(' ', ':')
+        return if (c === e || top == null) root else "$top ($root)"
     }
 
     /** Parsed destination. */
