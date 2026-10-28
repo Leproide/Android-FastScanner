@@ -1,0 +1,93 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FastScanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<resources>
+    <string name="settings">Impostazioni</string>
+    <string name="scan_single">Scansione singola</string>
+    <string name="scan_single_desc">Inquadra, scatta, conferma: caricamento immediato</string>
+    <string name="scan_multi">Scansione multipla</string>
+    <string name="scan_multi_desc">Scatta tutte le pagine che vuoi, poi Fine per inviare</string>
+    <string name="recent_uploads">Caricamenti recenti</string>
+    <string name="no_uploads">Nessun caricamento</string>
+    <string name="not_configured">Configura la destinazione (WebDAV o SMB) nelle impostazioni</string>
+    <string name="target">Destinazione: %1$s</string>
+    <string name="queued">In coda: %1$s</string>
+    <string name="scanner_error">Errore scanner: %1$s</string>
+    <string name="state_enqueued">In attesa di rete</string>
+    <string name="state_running">Caricamento…</string>
+    <string name="state_succeeded">Caricato</string>
+    <string name="state_failed">Errore</string>
+    <string name="state_retry">Nuovo tentativo</string>
+    <string name="state_cancelled">Annullato</string>
+    <string name="clear_finished">Pulisci elenco</string>
+    <string name="section_server">Server WebDAV</string>
+    <string name="server_url">Server (es. https://cloud.esempio.it)</string>
+    <string name="port">Porta (vuoto = predefinita)</string>
+    <string name="remote_path">Cartella remota (es. /remote.php/dav/files/utente/Scansioni)</string>
+    <string name="username">Utente</string>
+    <string name="password">Password</string>
+    <string name="trust_all">Fidati del certificato autofirmato di questo server</string>
+    <string name="trust_all_desc">Pinning del certificato: l\'impronta viene salvata alla prima \"Prova connessione\"; qualsiasi altro certificato verrà rifiutato</string>
+    <string name="section_output">Output</string>
+    <string name="format">Formato file</string>
+    <string name="prefix">Prefisso nome file</string>
+    <string name="section_scanner">Scanner</string>
+    <string name="scanner_mode">Modalità scanner</string>
+    <string name="mode_full">Completa (filtri, pulizia ombre/macchie)</string>
+    <string name="mode_filter">Base + filtri</string>
+    <string name="mode_base">Base (solo ritaglio)</string>
+    <string name="gallery_import">Consenti importazione dalla galleria</string>
+    <string name="save">Salva</string>
+    <string name="test">Prova connessione</string>
+    <string name="saved">Impostazioni salvate</string>
+    <string name="testing">Verifica in corso…</string>
+    <string name="test_ok">Connessione OK: %1$s</string>
+    <string name="test_fail">Errore: %1$s</string>
+    <string name="section_protocol">Destinazione</string>
+    <string name="use_webdav">Usa WebDAV</string>
+    <string name="use_smb">Usa SMB (cartella di rete Windows/NAS)</string>
+    <string name="section_smb">Server SMB (SMB2 / SMB3)</string>
+    <string name="smb_host">Host (es. nas, 192.168.1.10 o \\\\server\\share)</string>
+    <string name="smb_port">Porta (vuoto = 445)</string>
+    <string name="smb_share">Condivisione (es. Scansioni)</string>
+    <string name="smb_path">Sottocartella (opzionale, es. Ufficio/2026)</string>
+    <string name="smb_domain">Dominio (vuoto = account locale)</string>
+    <string name="smb_user">Utente (anche DOMINIO\\utente o utente@dominio.local)</string>
+    <string name="smb_signing">Firma SMB obbligatoria</string>
+    <string name="smb_signing_desc">Protegge dall\'alterazione dei dati; richiesta dai controller di dominio</string>
+    <string name="smb_encrypt">Crittografia SMB3 obbligatoria</string>
+    <string name="smb_encrypt_desc">Cifra il traffico (AES); il server deve supportare SMB 3.x</string>
+    <string name="smb_dfs">Supporto DFS</string>
+    <string name="smb_dfs_desc">Attiva se la condivisione è un namespace DFS di dominio</string>
+    <string name="smb_auth_note">Autenticazione NTLMv2. Account locale: lascia vuoto il dominio. Account di dominio: compila il dominio (es. CONTOSO) oppure scrivi CONTOSO\\utente o utente@contoso.local. Kerberos non è disponibile su Android.</string>
+    <string name="host_required">Host obbligatorio</string>
+    <string name="share_required">Condivisione obbligatoria</string>
+    <string name="err_access_denied_http">Accesso negato (HTTP %1$d): controlla le credenziali</string>
+    <string name="err_redirect">Il server reindirizza (HTTP %1$d): controlla http/https, porta e percorso</string>
+    <string name="err_http">Errore HTTP %1$d</string>
+    <string name="err_mkdir">Impossibile creare la cartella (HTTP %1$d)</string>
+    <string name="err_bad_url">URL del server non valido</string>
+    <string name="err_bad_path">Percorso non valido: \'.\' e \'..\' non sono ammessi</string>
+    <string name="err_network">Errore di rete: %1$s</string>
+    <string name="err_cert_pin_missing">Certificato autofirmato non ancora memorizzato: esegui \"Prova connessione\" nelle impostazioni</string>
+    <string name="err_cert_changed">Il certificato del server è CAMBIATO (possibile attacco). Memorizzato: %1$s — ricevuto: %2$s. Se il cambio è legittimo, disattiva e riattiva l\'opzione certificato autofirmato e poi esegui \"Prova connessione\".</string>
+    <string name="cert_trusted">Certificato memorizzato (SHA-256) — verifica che corrisponda al server, poi Salva:\n%1$s</string>
+    <string name="err_smb_no_encryption">Il server non supporta la crittografia SMB3</string>
+    <string name="err_smb_not_disk">\'%1$s\' non è una cartella condivisa</string>
+    <string name="err_smb_login">Login SMB fallito: utente, password o dominio errati</string>
+    <string name="err_smb_access">Accesso negato alla condivisione/cartella</string>
+    <string name="err_smb_no_share">La condivisione \'%1$s\' non esiste</string>
+    <string name="err_smb_path">Percorso non trovato</string>
+    <string name="err_smb_generic">Errore SMB: %1$s</string>
+    <string name="err_smb_no_host">Host SMB non impostato</string>
+    <string name="err_smb_no_share_name">Nome condivisione non impostato</string>
+    <string name="err_exists">Esiste già: %1$s</string>
+    <string name="err_not_configured">Destinazione non configurata</string>
+    <string name="err_too_many">Troppi file con lo stesso nome</string>
+    <string name="err_no_files">nessun file</string>
+    <string name="warn_http_title">Connessione non cifrata</string>
+    <string name="warn_http_msg">Con http:// password e documenti viaggiano in chiaro sulla rete. Usa https:// quando possibile. Salvare comunque?</string>
+    <string name="save_anyway">Salva comunque</string>
+    <string name="about">Informazioni</string>
+    <string name="credits_footer">FastScanner %1$s · di Leproide · GitHub</string>
+    <string name="about_html"><![CDATA[<b>FastScanner</b> %1$s<br/>Scanner di documenti con caricamento diretto su WebDAV o SMB.<br/><br/><b>Autore</b><br/>Leproide — <a href=\"%2$s\">%2$s</a><br/><br/><b>Licenza</b><br/>GNU General Public License v3.0<br/><br/><b>Componenti di terze parti</b><br/>• Google ML Kit Document Scanner<br/>• smbj — Apache License 2.0<br/>• OkHttp — Apache License 2.0<br/>• Bouncy Castle — MIT License<br/>• AndroidX, Material Components, Kotlin coroutines — Apache License 2.0]]></string>
+</resources>

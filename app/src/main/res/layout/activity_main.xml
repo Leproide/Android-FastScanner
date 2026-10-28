@@ -64,6 +64,13 @@
 
         <LinearLayout android:id="@+id/listUploads" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:orientation="vertical"/>
+
+        <TextView android:id="@+id/txtCredits" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:layout_marginTop="32dp"
+            android:gravity="center" android:padding="8dp"
+            android:background="?attr/selectableItemBackground"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorPrimary"/>
     </LinearLayout>
 </ScrollView>
 </LinearLayout>

@@ -80,7 +80,7 @@ class SmbUploader(private val cfg: Config) : Uploader {
         val conn = c.connect(target.host, target.port).also { connection = it }
 
         if (cfg.smbEncrypt && !conn.connectionContext.supportsEncryption()) {
-            throw UploadException("Il server non supporta la crittografia SMB3", permanent = true)
+            throw UploadException(R.string.err_smb_no_encryption, permanent = true)
         }
 
         val (user, domain) = splitUser(cfg.smbUser, cfg.smbDomain)
@@ -89,7 +89,7 @@ class SmbUploader(private val cfg: Config) : Uploader {
 
         val s = conn.authenticate(auth).also { session = it }
         val sh = s.connectShare(target.share) as? DiskShare
-            ?: throw UploadException("'${target.share}' non è una cartella condivisa", permanent = true)
+            ?: throw UploadException(R.string.err_smb_not_disk, permanent = true, args = listOf(target.share))
         share = sh
 
         // Create the folder tree level by level.
@@ -101,7 +101,7 @@ class SmbUploader(private val cfg: Config) : Uploader {
     }
 
     override fun upload(file: File, name: String, mime: String): Unit = wrap {
-        val sh = share ?: throw IllegalStateException("prepare() non chiamato")
+        val sh = share ?: throw IllegalStateException("prepare() not called")
         val path = (target.folder + name).joinToString("\\")
         val remote = try {
             sh.openFile(
@@ -142,20 +142,23 @@ class SmbUploader(private val cfg: Config) : Uploader {
     } catch (e: SMBApiException) {
         throw when (e.status) {
             NtStatus.STATUS_LOGON_FAILURE ->
-                UploadException("Login SMB fallito: utente/password/dominio errati", true, e)
+                UploadException(R.string.err_smb_login, true, cause = e)
             NtStatus.STATUS_ACCESS_DENIED ->
-                UploadException("Accesso negato alla condivisione/cartella", true, e)
+                UploadException(R.string.err_smb_access, true, cause = e)
             NtStatus.STATUS_BAD_NETWORK_NAME ->
-                UploadException("Condivisione '${target.share}' inesistente", true, e)
+                UploadException(R.string.err_smb_no_share, true, listOf(target.share), e)
             NtStatus.STATUS_OBJECT_PATH_NOT_FOUND ->
-                UploadException("Percorso non trovato", true, e)
-            else -> UploadException("SMB: ${e.status} (0x${java.lang.Long.toHexString(e.statusCode)})", false, e)
+                UploadException(R.string.err_smb_path, true, cause = e)
+            else -> UploadException(
+                R.string.err_smb_generic, false,
+                listOf("${e.status} (0x${java.lang.Long.toHexString(e.statusCode)})"), e
+            )
         }
     } catch (e: SMBRuntimeException) {
         // Transport / protocol problems: usually transient (network drop, timeout).
-        throw UploadException("SMB: ${e.message ?: e.javaClass.simpleName}", false, e)
+        throw UploadException(R.string.err_smb_generic, false, listOf(e.message ?: e.javaClass.simpleName), e)
     } catch (e: IOException) {
-        throw UploadException("Rete: ${e.message ?: e.javaClass.simpleName}", false, e)
+        throw UploadException(R.string.err_network, false, listOf(e.message ?: e.javaClass.simpleName), e)
     }
 
     /** Parsed destination. */
@@ -171,14 +174,15 @@ class SmbUploader(private val cfg: Config) : Uploader {
         fun parseTarget(cfg: Config): Target {
             val raw = cfg.smbHost.trim().removePrefix("smb://").trimStart('\\', '/')
             val parts = raw.split('\\', '/').filter { it.isNotBlank() }
-            if (parts.isEmpty()) throw UploadException("Host SMB non impostato", permanent = true)
+            if (parts.isEmpty()) throw UploadException(R.string.err_smb_no_host, permanent = true)
             val host = parts[0]
             val share = cfg.smbShare.trim().trim('\\', '/').ifEmpty { parts.getOrNull(1).orEmpty() }
-            if (share.isEmpty()) throw UploadException("Nome condivisione non impostato", permanent = true)
+            if (share.isEmpty()) throw UploadException(R.string.err_smb_no_share_name, permanent = true)
             val folderSrc = cfg.smbPath.ifBlank {
                 if (cfg.smbShare.isBlank()) parts.drop(2).joinToString("/") else ""
             }
-            val folder = folderSrc.split('\\', '/').map { it.trim() }.filter { it.isNotEmpty() }
+            // Same rules as WebDAV: no '.' / '..' segments.
+            val folder = WebDavClient.segmentsOf(folderSrc)
             return Target(host, cfg.smbPort ?: DEFAULT_PORT, share, folder)
         }
 

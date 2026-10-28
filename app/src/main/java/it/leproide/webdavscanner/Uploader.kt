@@ -18,19 +18,35 @@
 
 package it.leproide.webdavscanner
 
+import android.content.Context
+import androidx.annotation.StringRes
 import java.io.Closeable
 import java.io.File
 import java.io.IOException
 
 /**
- * Upload failure. [permanent] = retrying will not help (wrong credentials,
- * missing share, access denied...): the job is marked failed immediately.
+ * Upload failure with a localizable message ([res] + [args]).
+ * [permanent] = retrying will not help (wrong credentials, missing share,
+ * certificate changed...): the job is marked failed immediately.
  */
-open class UploadException(message: String, val permanent: Boolean, cause: Throwable? = null) :
-    IOException(message, cause)
+open class UploadException(
+    @StringRes val res: Int,
+    val permanent: Boolean,
+    val args: List<Any?> = emptyList(),
+    cause: Throwable? = null,
+) : IOException("res#$res $args", cause) {
+    /** Message in the device language. */
+    fun localized(ctx: Context): String = ctx.getString(res, *args.toTypedArray())
+}
 
 /** The remote name is already taken: the caller retries with another name. */
-class AlreadyExistsException(name: String) : UploadException("Esiste già: $name", permanent = false)
+class AlreadyExistsException(name: String) :
+    UploadException(R.string.err_exists, permanent = false, args = listOf(name))
+
+/** Localized message for any throwable (used by worker and settings). */
+fun Throwable.userMessage(ctx: Context): String =
+    if (this is UploadException) localized(ctx)
+    else ctx.getString(R.string.err_generic, message ?: javaClass.simpleName)
 
 /**
  * Common contract for the upload back-ends (WebDAV, SMB).
@@ -56,8 +72,9 @@ interface Uploader : Closeable {
     }
 
     companion object {
-        fun forConfig(cfg: Config): Uploader = when (cfg.protocol) {
-            Protocol.WEBDAV -> WebDavUploader(cfg)
+        /** [capturePin] = settings test may record a new self-signed certificate. */
+        fun forConfig(cfg: Config, capturePin: Boolean = false): Uploader = when (cfg.protocol) {
+            Protocol.WEBDAV -> WebDavUploader(cfg, capturePin)
             Protocol.SMB -> SmbUploader(cfg)
         }
 
@@ -70,8 +87,8 @@ interface Uploader : Closeable {
 }
 
 /** Adapter: existing [WebDavClient] behind the [Uploader] interface. */
-class WebDavUploader(cfg: Config) : Uploader {
-    private val client = WebDavClient(cfg)
+class WebDavUploader(cfg: Config, capturePin: Boolean = false) : Uploader {
+    val client = WebDavClient(cfg, capturePin)
     override val destination: String = client.baseUrl.toString()
     override fun prepare() = client.ensureDirectory()
     override fun upload(file: File, name: String, mime: String) {

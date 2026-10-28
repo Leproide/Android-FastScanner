@@ -51,7 +51,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
 
         val cfg = Prefs.load(applicationContext)
-        if (!cfg.isConfigured) return@withContext fail("Server non configurato")
+        if (!cfg.isConfigured) return@withContext fail(applicationContext.getString(R.string.err_not_configured))
 
         try {
             // Back-end chosen in settings (WebDAV or SMB) at upload time.
@@ -67,15 +67,15 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
             }
         } catch (e: UploadException) {
             Log.w(TAG, "Upload failed", e)
-            if (e.permanent || runAttemptCount >= MAX_ATTEMPTS) fail(e.message ?: "Errore")
+            if (e.permanent || runAttemptCount >= MAX_ATTEMPTS) fail(e.userMessage(applicationContext))
             else Result.retry()
         } catch (e: IOException) {
             // Network / TLS / timeout: transient unless we've tried too often.
             Log.w(TAG, "Upload I/O error", e)
-            if (runAttemptCount >= MAX_ATTEMPTS) fail(e.message ?: e.javaClass.simpleName) else Result.retry()
+            if (runAttemptCount >= MAX_ATTEMPTS) fail(e.userMessage(applicationContext)) else Result.retry()
         } catch (e: Exception) {
             Log.e(TAG, "Upload unexpected error", e)
-            fail(e.message ?: e.javaClass.simpleName)
+            fail(e.userMessage(applicationContext))
         }
     }
 
@@ -92,7 +92,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 up.upload(f, name, mime)
                 return
             } catch (e: AlreadyExistsException) {
-                if (n >= 50) throw UploadException("Troppi file con lo stesso nome", permanent = true)
+                if (n >= 50) throw UploadException(R.string.err_too_many, permanent = true)
                 n++
             }
         }
@@ -104,6 +104,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         private const val TAG = "UploadWorker"
         const val WORK_TAG = "upload"
         const val LABEL_PREFIX = "label:"
+        const val JOB_PREFIX = "job:"
         const val KEY_DIR = "dir"
         const val KEY_PROGRESS = "progress"
         const val KEY_ERROR = "error"
@@ -120,6 +121,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .addTag(WORK_TAG)
                 .addTag(LABEL_PREFIX + label)
+                .addTag(JOB_PREFIX + jobDir.name) // lets the UI delete files of failed jobs
                 .build()
             WorkManager.getInstance(ctx).enqueue(req)
         }

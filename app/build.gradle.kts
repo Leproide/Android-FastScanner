@@ -29,8 +29,8 @@ android {
         applicationId = "it.leproide.webdavscanner"
         minSdk = 24
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0"
+        versionCode = 3
+        versionName = "1.2.0"
     }
 
     buildTypes {
@@ -88,6 +88,6 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
     // SMB2/SMB3 client (NTLMv2 auth, signing, SMB 3.x AES encryption). Pure Java, no SMB1.
     implementation("com.hierynomus:smbj:0.13.0")
-    // Newer BouncyCastle than the one smbj pulls (1.75): crypto for NTLM (MD4) and SMB3 AES-CMAC/GCM/CCM.
-    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
+    // Newer BouncyCastle than the one smbj pulls (1.75, has known CVEs): crypto for NTLM (MD4) and SMB3 AES-CMAC/GCM/CCM.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.80")
 }

@@ -47,7 +47,8 @@ data class Config(
     val remotePath: String,
     val username: String,
     val password: String,
-    val trustAll: Boolean,
+    val trustAll: Boolean,   // self-signed certificate: pinning mode
+    val certPin: String,     // SHA-256 of the pinned leaf certificate ("" = not yet captured)
     // --- SMB2/3 ---
     val smbHost: String,
     val smbPort: Int?,       // null = 445
@@ -91,6 +92,7 @@ object Prefs {
             username = p.getString("user", "") ?: "",
             password = p.getString("pass", null)?.let { Crypto.decrypt(it) } ?: "",
             trustAll = p.getBoolean("trustAll", false),
+            certPin = p.getString("certPin", "") ?: "",
             smbHost = p.getString("smbHost", "") ?: "",
             smbPort = p.getInt("smbPort", -1).takeIf { it in 1..65535 },
             smbShare = p.getString("smbShare", "") ?: "",
@@ -119,6 +121,7 @@ object Prefs {
             .putString("user", c.username)
             .putString("pass", Crypto.encrypt(c.password))
             .putBoolean("trustAll", c.trustAll)
+            .putString("certPin", if (c.trustAll) c.certPin else "")
             .putString("smbHost", c.smbHost.trim())
             .putInt("smbPort", c.smbPort ?: -1)
             .putString("smbShare", c.smbShare.trim())

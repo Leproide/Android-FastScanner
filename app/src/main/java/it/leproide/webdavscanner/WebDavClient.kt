@@ -25,23 +25,44 @@ import okhttp3.HttpUrl.Companion.toHttpUrlOrNull
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.Request
+import okhttp3.Response
 import okhttp3.RequestBody.Companion.asRequestBody
 import okhttp3.RequestBody.Companion.toRequestBody
 import java.io.File
 import java.io.IOException
+import java.security.MessageDigest
 import java.security.SecureRandom
+import java.security.cert.CertificateException
 import java.security.cert.X509Certificate
 import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
-/** Thrown for HTTP errors; [permanent] = retrying will not help (auth, bad path...). */
-class WebDavException(val code: Int, msg: String) :
-    UploadException(msg, permanent = code in 400..499 && code != 408 && code != 429)
+/** Thrown for HTTP errors; permanent = retrying will not help (auth, bad path...). */
+class WebDavException(val code: Int, res: Int, vararg args: Any?) :
+    UploadException(res, permanent = code in 400..499 && code != 408 && code != 429, args = args.toList())
 
-/** Minimal WebDAV client: PROPFIND (check), MKCOL (create dirs), PUT (upload). */
-class WebDavClient(private val cfg: Config) {
+/**
+ * Minimal WebDAV client: PROPFIND (check), MKCOL (create dirs), PUT (upload).
+ *
+ * TLS: system + user CAs by default. For self-signed servers the user enables
+ * certificate pinning (trust-on-first-use): the SHA-256 of the server leaf
+ * certificate is captured on "Test connection" and every later connection is
+ * accepted ONLY if the certificate matches. No "trust everything" mode exists.
+ *
+ * @param capturePin true only for the settings test: accepts an unknown
+ *                   certificate (when no pin is stored yet) and records it.
+ */
+class WebDavClient(private val cfg: Config, private val capturePin: Boolean = false) {
+
+    /** Leaf fingerprint observed during the last handshake (pinning mode only). */
+    @Volatile var seenPin: String? = null
+        private set
+
+    /** Non-null when the server presented a certificate different from the pinned one. */
+    @Volatile var pinMismatch: String? = null
+        private set
 
     private val http: OkHttpClient = buildClient()
 
@@ -53,27 +74,49 @@ class WebDavClient(private val cfg: Config) {
             .connectTimeout(20, TimeUnit.SECONDS)
             .readTimeout(60, TimeUnit.SECONDS)
             .writeTimeout(180, TimeUnit.SECONDS)
-            .followRedirects(false) // PUT must not be silently redirected to GET
+            .followRedirects(false) // never forward credentials/PUT bodies to another location
+            .followSslRedirects(false)
         if (cfg.username.isNotEmpty()) {
-            // Preemptive Basic auth (supported by Nextcloud, ownCloud, Synology, QNAP, Apache, nginx).
+            // Preemptive Basic auth (Nextcloud, ownCloud, Synology, QNAP, Apache, nginx).
+            // Sent only to the configured host because redirects are disabled.
             val auth = Credentials.basic(cfg.username, cfg.password, Charsets.UTF_8)
             b.addInterceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("Authorization", auth).build())
             }
         }
-        if (cfg.trustAll) applyTrustAll(b)
+        if (cfg.trustAll) applyPinning(b)
         return b.build()
     }
 
-    @SuppressLint("CustomX509TrustManager", "TrustAllX509TrustManager")
-    private fun applyTrustAll(b: OkHttpClient.Builder) {
+    @SuppressLint("CustomX509TrustManager")
+    private fun applyPinning(b: OkHttpClient.Builder) {
+        val expected = cfg.certPin
         val tm = object : X509TrustManager {
-            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {}
-            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {}
+            override fun checkClientTrusted(chain: Array<X509Certificate>, authType: String) {
+                throw CertificateException("Client certificates not supported")
+            }
+
+            override fun checkServerTrusted(chain: Array<X509Certificate>, authType: String) {
+                if (chain.isEmpty()) throw CertificateException("Empty certificate chain")
+                val leaf = chain[0]
+                leaf.checkValidity() // still reject expired / not-yet-valid certificates
+                val pin = fingerprint(leaf)
+                seenPin = pin
+                if (expected.isEmpty()) {
+                    if (!capturePin) throw CertificateException("No pinned certificate")
+                    return // first use, settings test: recorded in seenPin
+                }
+                if (!MessageDigest.isEqual(pin.toByteArray(), expected.toByteArray())) {
+                    pinMismatch = pin
+                    throw CertificateException("Pinned certificate mismatch")
+                }
+            }
+
             override fun getAcceptedIssuers(): Array<X509Certificate> = emptyArray()
         }
         val ctx = SSLContext.getInstance("TLS").apply { init(null, arrayOf<TrustManager>(tm), SecureRandom()) }
         b.sslSocketFactory(ctx.socketFactory, tm)
+        // The pinned certificate identifies the server; self-signed certs often lack a matching SAN.
         b.hostnameVerifier { _, _ -> true }
     }
 
@@ -86,19 +129,32 @@ class WebDavClient(private val cfg: Config) {
 
     private fun rootUrl(): HttpUrl = baseServerUrl(cfg)
 
-    private val pathSegments: List<String> =
-        cfg.remotePath.split('/').map { it.trim() }.filter { it.isNotEmpty() }
+    private val pathSegments: List<String> = segmentsOf(cfg.remotePath)
+
+    /** Executes a call translating TLS pin problems into clear, permanent errors. */
+    private inline fun <T> exec(req: Request, block: (Response) -> T): T {
+        try {
+            return http.newCall(req).execute().use(block)
+        } catch (e: IOException) {
+            if (e is UploadException) throw e
+            pinMismatch?.let { throw UploadException(R.string.err_cert_changed, true, listOf(cfg.certPin, it), e) }
+            if (cfg.trustAll && cfg.certPin.isEmpty() && !capturePin) {
+                throw UploadException(R.string.err_cert_pin_missing, true, cause = e)
+            }
+            throw UploadException(R.string.err_network, false, listOf(e.message ?: e.javaClass.simpleName), e)
+        }
+    }
 
     /** PROPFIND Depth:0. Returns HTTP status code. */
     private fun propfind(url: HttpUrl): Int {
         val body = PROPFIND_BODY.toRequestBody("application/xml; charset=utf-8".toMediaType())
         val req = Request.Builder().url(url).method("PROPFIND", body).header("Depth", "0").build()
-        http.newCall(req).execute().use { return it.code }
+        return exec(req) { it.code }
     }
 
     private fun mkcol(url: HttpUrl): Int {
         val req = Request.Builder().url(url).method("MKCOL", null).build()
-        http.newCall(req).execute().use { return it.code }
+        return exec(req) { it.code }
     }
 
     /**
@@ -107,17 +163,16 @@ class WebDavClient(private val cfg: Config) {
      * only the final folder status matters.
      */
     fun ensureDirectory() {
-        if (pathSegments.isEmpty()) return
         val target = dirUrl(pathSegments)
         val code = propfind(target)
         if (code == 207 || code == 200) return
-        if (code == 401 || code == 403) throw WebDavException(code, "Accesso negato ($code): controlla credenziali")
-        if (code in 300..399) throw WebDavException(400, "Il server reindirizza (HTTP $code): controlla http/https, porta e percorso")
-        if (code != 404 && code != 409) throw WebDavException(code, "PROPFIND HTTP $code")
+        if (code == 401 || code == 403) throw WebDavException(code, R.string.err_access_denied_http, code)
+        if (code in 300..399) throw WebDavException(400, R.string.err_redirect, code)
+        if (pathSegments.isEmpty() || (code != 404 && code != 409)) throw WebDavException(code, R.string.err_http, code)
         for (i in 1..pathSegments.size) {
             val c = mkcol(dirUrl(pathSegments.take(i)))
             if (i == pathSegments.size && c !in listOf(200, 201, 204, 405)) {
-                throw WebDavException(c, "Impossibile creare la cartella (HTTP $c)")
+                throw WebDavException(c, R.string.err_mkdir, c)
             }
         }
     }
@@ -137,17 +192,15 @@ class WebDavClient(private val cfg: Config) {
             .put(file.asRequestBody(mime.toMediaType()))
             .header("If-None-Match", "*")
             .build()
-        http.newCall(req).execute().use { r ->
-            if (r.code in 200..299) return url.toString()
-            throw WebDavException(r.code, "PUT HTTP ${r.code} ${r.message}")
+        return exec(req) { r ->
+            if (r.code in 200..299) url.toString()
+            else throw WebDavException(r.code, R.string.err_http, r.code)
         }
     }
 
     /** Connection test used by the settings screen. */
     fun test(): String {
         ensureDirectory()
-        val code = propfind(dirUrl(pathSegments))
-        if (code != 207 && code != 200) throw WebDavException(code, "HTTP $code")
         return dirUrl(pathSegments).toString()
     }
 
@@ -155,12 +208,25 @@ class WebDavClient(private val cfg: Config) {
         private const val PROPFIND_BODY =
             "<?xml version=\"1.0\" encoding=\"utf-8\"?><d:propfind xmlns:d=\"DAV:\"><d:prop><d:resourcetype/></d:prop></d:propfind>"
 
+        /** SHA-256 of the DER certificate, uppercase hex with ':' separators. */
+        fun fingerprint(cert: X509Certificate): String =
+            MessageDigest.getInstance("SHA-256").digest(cert.encoded)
+                .joinToString(":") { "%02X".format(it) }
+
+        /** Splits a remote path; rejects '.' / '..' so the path cannot climb above the base. */
+        fun segmentsOf(path: String): List<String> {
+            val segs = path.split('/', '\\').map { it.trim() }.filter { it.isNotEmpty() }
+            if (segs.any { it == "." || it == ".." }) throw UploadException(R.string.err_bad_path, true)
+            return segs
+        }
+
         /** scheme://host[:port][/server-path] — server path kept if typed in the server field. */
         fun baseServerUrl(cfg: Config): HttpUrl {
             var s = cfg.server.trim()
             if (!s.contains("://")) s = "https://$s"
-            val u = s.toHttpUrlOrNull() ?: throw IllegalArgumentException("URL server non valido")
-            val b = u.newBuilder()
+            val u = s.toHttpUrlOrNull() ?: throw UploadException(R.string.err_bad_url, true)
+            if (u.pathSegments.any { it == "." || it == ".." }) throw UploadException(R.string.err_bad_path, true)
+            val b = u.newBuilder().query(null).fragment(null)
             cfg.port?.let { b.port(it) }
             // Drop a trailing empty segment so addPathSegment appends cleanly.
             val built = b.build()
@@ -172,7 +238,7 @@ class WebDavClient(private val cfg: Config) {
         /** Human readable destination for the main screen. */
         fun buildBaseUrl(cfg: Config): HttpUrl {
             val b = baseServerUrl(cfg).newBuilder()
-            cfg.remotePath.split('/').filter { it.isNotBlank() }.forEach { b.addPathSegment(it.trim()) }
+            segmentsOf(cfg.remotePath).forEach { b.addPathSegment(it) }
             return b.build()
         }
     }

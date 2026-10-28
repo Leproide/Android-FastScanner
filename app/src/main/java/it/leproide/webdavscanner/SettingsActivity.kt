@@ -27,6 +27,7 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.android.material.materialswitch.MaterialSwitch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -74,6 +75,9 @@ class SettingsActivity : AppCompatActivity() {
     /** Guards against listener recursion while flipping the paired switch. */
     private var syncing = false
 
+    /** Pinned WebDAV certificate (SHA-256); captured by "Test connection". */
+    private var certPin = ""
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
         super.onCreate(savedInstanceState)
@@ -118,15 +122,43 @@ class SettingsActivity : AppCompatActivity() {
         swSmb.setOnCheckedChangeListener { _, on -> selectProtocol(if (on) Protocol.SMB else Protocol.WEBDAV) }
         updateSections()
 
+        // Toggling the self-signed option (or changing server) forgets the pinned certificate.
+        swTrustAll.setOnCheckedChangeListener { _, _ -> certPin = ""; txtResult.text = "" }
+
         findViewById<Button>(R.id.btnSave).setOnClickListener {
-            readForm()?.let {
-                Prefs.save(this, it)
-                Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
-                finish()
-            }
+            val cfg = readForm() ?: return@setOnClickListener
+            if (isCleartextWithCredentials(cfg)) {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.warn_http_title)
+                    .setMessage(R.string.warn_http_msg)
+                    .setPositiveButton(R.string.save_anyway) { _, _ -> save(cfg) }
+                    .setNegativeButton(android.R.string.cancel, null)
+                    .show()
+            } else save(cfg)
         }
         findViewById<Button>(R.id.btnTest).setOnClickListener { testConnection() }
     }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        super.onSaveInstanceState(outState)
+        outState.putString("certPin", certPin)
+    }
+
+    override fun onRestoreInstanceState(savedInstanceState: Bundle) {
+        super.onRestoreInstanceState(savedInstanceState)
+        certPin = savedInstanceState.getString("certPin", "")
+    }
+
+    private fun save(cfg: Config) {
+        Prefs.save(this, cfg)
+        Toast.makeText(this, R.string.saved, Toast.LENGTH_SHORT).show()
+        finish()
+    }
+
+    /** Basic auth over plain http exposes the password on the network. */
+    private fun isCleartextWithCredentials(c: Config) =
+        c.protocol == Protocol.WEBDAV && c.username.isNotEmpty() &&
+            c.server.trim().startsWith("http://", ignoreCase = true)
 
     override fun onSupportNavigateUp(): Boolean {
         finish()
@@ -163,6 +195,7 @@ class SettingsActivity : AppCompatActivity() {
         edtUser.setText(c.username)
         edtPass.setText(c.password)
         swTrustAll.isChecked = c.trustAll
+        certPin = c.certPin
 
         edtSmbHost.setText(c.smbHost)
         edtSmbPort.setText(c.smbPort?.toString() ?: "")
@@ -233,6 +266,7 @@ class SettingsActivity : AppCompatActivity() {
             username = edtUser.text.toString(),
             password = edtPass.text.toString(),
             trustAll = swTrustAll.isChecked,
+            certPin = if (swTrustAll.isChecked) certPin else "",
             smbHost = edtSmbHost.text.toString().trim(),
             smbPort = smbPort,
             smbShare = edtSmbShare.text.toString().trim(),
@@ -265,10 +299,8 @@ class SettingsActivity : AppCompatActivity() {
             }
             cfg
         } catch (e: UploadException) {
-            // SMB: missing share
-            edtSmbShare.error = e.message; null
-        } catch (e: IllegalArgumentException) {
-            edtServer.error = e.message; null
+            val field = if (protocol == Protocol.SMB) edtSmbShare else edtServer
+            field.error = e.localized(this); null
         }
     }
 
@@ -277,10 +309,19 @@ class SettingsActivity : AppCompatActivity() {
         txtResult.text = getString(R.string.testing)
         lifecycleScope.launch {
             val msg = withContext(Dispatchers.IO) {
+                // capturePin: a self-signed certificate seen for the first time is recorded.
+                val up = Uploader.forConfig(cfg, capturePin = true)
                 try {
-                    Uploader.forConfig(cfg).use { getString(R.string.test_ok, it.test()) }
+                    val dest = up.use { it.test() }
+                    val ok = getString(R.string.test_ok, dest)
+                    val seen = (up as? WebDavUploader)?.client?.seenPin
+                    if (cfg.protocol == Protocol.WEBDAV && cfg.trustAll && seen != null) {
+                        val isNew = cfg.certPin.isEmpty()
+                        withContext(Dispatchers.Main) { certPin = seen }
+                        if (isNew) ok + "\n\n" + getString(R.string.cert_trusted, seen) else ok
+                    } else ok
                 } catch (e: Exception) {
-                    getString(R.string.test_fail, e.message ?: e.javaClass.simpleName)
+                    getString(R.string.test_fail, e.userMessage(this@SettingsActivity))
                 }
             }
             txtResult.text = msg

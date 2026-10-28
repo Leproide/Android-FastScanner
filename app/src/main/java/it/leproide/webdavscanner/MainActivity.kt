@@ -24,7 +24,9 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
+import android.text.method.LinkMovementMethod
 import android.view.MenuItem
+import android.widget.ScrollView
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -32,15 +34,18 @@ import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.IntentSenderRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.text.HtmlCompat
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanningResult
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -81,8 +86,11 @@ class MainActivity : AppCompatActivity() {
 
         findViewById<android.view.View>(R.id.cardSingle).setOnClickListener { startScan(multi = false) }
         findViewById<android.view.View>(R.id.cardMulti).setOnClickListener { startScan(multi = true) }
-        findViewById<android.view.View>(R.id.btnClear).setOnClickListener {
-            WorkManager.getInstance(this).pruneWork()
+        findViewById<android.view.View>(R.id.btnClear).setOnClickListener { clearFinished() }
+        findViewById<TextView>(R.id.txtCredits).apply {
+            val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: ""
+            text = getString(R.string.credits_footer, version)
+            setOnClickListener { openGithub() }
         }
 
         observeUploads()
@@ -109,9 +117,13 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        if (item.itemId == R.id.action_settings) {
-            startActivity(Intent(this, SettingsActivity::class.java))
-            return true
+        when (item.itemId) {
+            R.id.action_settings -> {
+                startActivity(Intent(this, SettingsActivity::class.java)); return true
+            }
+            R.id.action_about -> {
+                showAbout(); return true
+            }
         }
         return super.onOptionsItemSelected(item)
     }
@@ -181,15 +193,71 @@ class MainActivity : AppCompatActivity() {
                     Log.e(TAG, "Copy failed", e)
                     dir.deleteRecursively()
                     null
+                } finally {
+                    deleteScannerOutput(result)
                 }
             }
             if (jobDir == null || jobDir.list().isNullOrEmpty()) {
-                Toast.makeText(this@MainActivity, getString(R.string.scanner_error, "nessun file"), Toast.LENGTH_LONG).show()
+                Toast.makeText(this@MainActivity, getString(R.string.scanner_error, getString(R.string.err_no_files)), Toast.LENGTH_LONG).show()
                 return@launch
             }
             UploadWorker.enqueue(this@MainActivity, jobDir, base)
             Toast.makeText(this@MainActivity, getString(R.string.queued, base), Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * The scanner leaves its PDF/JPEG output in our cache: delete it right away so
+     * scanned documents do not linger on the device after the upload.
+     */
+    private fun deleteScannerOutput(result: GmsDocumentScanningResult) {
+        val uris = listOfNotNull(result.pdf?.uri) + result.pages.orEmpty().map { it.imageUri }
+        val roots = listOf(cacheDir.canonicalPath, filesDir.canonicalPath)
+        uris.filter { it.scheme == "file" }.mapNotNull { it.path?.let(::File) }.forEach { f ->
+            val p = runCatching { f.canonicalPath }.getOrNull() ?: return@forEach
+            // Only our own private dirs, never the pending upload folder.
+            if (roots.any { p.startsWith(it + File.separator) } && !p.contains("${File.separator}pending${File.separator}")) {
+                f.delete()
+            }
+        }
+    }
+
+    /** Removes finished jobs from the list and deletes local files of failed/cancelled ones. */
+    private fun clearFinished() {
+        lifecycleScope.launch {
+            val wm = WorkManager.getInstance(this@MainActivity)
+            val infos = wm.getWorkInfosByTagFlow(UploadWorker.WORK_TAG).first()
+            val active = infos.filter { !it.state.isFinished }
+                .mapNotNull { i -> i.tags.firstOrNull { it.startsWith(UploadWorker.JOB_PREFIX) } }
+                .map { it.removePrefix(UploadWorker.JOB_PREFIX) }
+                .toSet()
+            withContext(Dispatchers.IO) {
+                File(filesDir, "pending").listFiles()?.filter { it.name !in active }?.forEach { it.deleteRecursively() }
+            }
+            wm.pruneWork()
+        }
+    }
+
+    private fun showAbout() {
+        val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: ""
+        val html = getString(R.string.about_html, version, GITHUB_URL)
+        val msg = TextView(this).apply {
+            text = HtmlCompat.fromHtml(html, HtmlCompat.FROM_HTML_MODE_COMPACT)
+            movementMethod = LinkMovementMethod.getInstance()
+            val pad = (20 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, 0)
+            setTextAppearance(com.google.android.material.R.style.TextAppearance_Material3_BodyMedium)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.app_name)
+            .setView(ScrollView(this).apply { addView(msg) })
+            .setPositiveButton(android.R.string.ok, null)
+            .setNeutralButton(R.string.open_github) { _, _ -> openGithub() }
+            .show()
+    }
+
+    private fun openGithub() {
+        runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(GITHUB_URL))) }
     }
 
     private fun copy(src: Uri, dst: File) {
@@ -258,6 +326,7 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TAG = "MainActivity"
+        const val GITHUB_URL = "https://github.com/Leproide"
         const val ACTION_SINGLE = "it.leproide.webdavscanner.SCAN_SINGLE"
         const val ACTION_MULTI = "it.leproide.webdavscanner.SCAN_MULTI"
     }
