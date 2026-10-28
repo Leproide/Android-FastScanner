@@ -7,8 +7,8 @@ Android document scanner that uploads straight to a **WebDAV** server **or** an 
 ## Features
 
 - **Google ML Kit Document Scanner** (same engine as "WebDAV Scan"): automatic edge detection, auto-capture, crop and perspective correction, filters (color, grayscale, B/W), shadow / stain / finger removal.
-- **Single scan**: tap → frame → shoot → *Fine* → uploaded.
-- **Multi scan**: tap → shoot as many pages as you want → *Fine* → uploaded (one multi-page PDF and/or numbered JPGs).
+- **Single scan**: tap → frame → shoot → *Done* → uploaded.
+- **Multi scan**: tap → shoot as many pages as you want → *Done* → uploaded (one multi-page PDF and/or numbered JPGs).
 - **Automatic file name**: `<prefix>yyyy-MM-dd_HH-mm-ss` (e.g. `scan_2026-10-28_15-47-12.pdf`).
   Two scans in the same second get `-2`, `-3`; the upload uses `If-None-Match: *` so an existing remote file is **never overwritten**.
 - **Output format** (settings): PDF, JPG, or both. Multi-page JPGs are named `..._01.jpg`, `..._02.jpg`.
@@ -20,9 +20,9 @@ Android document scanner that uploads straight to a **WebDAV** server **or** an 
   - **domain accounts**: domain field (e.g. `CONTOSO`), or `CONTOSO\user`, or UPN `user@contoso.local`;
   - authentication NTLMv2 (Kerberos is not available on Android);
   - target folder tree created automatically, files created with `FILE_CREATE` so nothing is ever overwritten.
-- **Languages**: Italian on Italian devices, English everywhere else.
+- **Languages**: Italian on Italian devices, English everywhere else. UI labels in this README are the English ones (Italian: *Test connection* = *Prova connessione*, *Retry* = *Riprova*, *Clear list* = *Pulisci elenco*).
 - **About** screen with credits, license and third-party components.
-- **Launcher shortcuts**: long-press the icon → *Scansione singola* / *Scansione multipla* to open the camera directly.
+- **Launcher shortcuts**: long-press the icon → *Single scan* / *Multi-page scan* to open the camera directly.
 
 ## Settings examples
 
@@ -42,7 +42,7 @@ Android document scanner that uploads straight to a **WebDAV** server **or** an 
 | File server, domain account | `fs01.contoso.local` | `Dati` | `Scansioni/2026` | `CONTOSO` | `mario` |
 | Pasted UNC path | `\\fs01\Dati\Scansioni` | | | | `CONTOSO\mario` |
 
-Use **Prova connessione** to verify credentials and create the folder.
+Use **Test connection** to verify credentials and create the folder.
 
 ## Security notes
 
