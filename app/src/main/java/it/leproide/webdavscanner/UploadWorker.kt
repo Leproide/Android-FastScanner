@@ -105,6 +105,7 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         const val WORK_TAG = "upload"
         const val LABEL_PREFIX = "label:"
         const val JOB_PREFIX = "job:"
+        const val TIME_PREFIX = "t:"
         const val KEY_DIR = "dir"
         const val KEY_PROGRESS = "progress"
         const val KEY_ERROR = "error"
@@ -121,8 +122,10 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 15, TimeUnit.SECONDS)
                 .addTag(WORK_TAG)
                 .addTag(LABEL_PREFIX + label)
-                .addTag(JOB_PREFIX + jobDir.name) // lets the UI delete files of failed jobs
+                .addTag(JOB_PREFIX + jobDir.name) // lets the UI retry / delete files of failed jobs
+                .addTag(TIME_PREFIX + System.currentTimeMillis()) // newest record wins after a retry
                 .build()
+            jobDir.setLastModified(System.currentTimeMillis()) // restarts the failed-retention clock
             WorkManager.getInstance(ctx).enqueue(req)
         }
     }

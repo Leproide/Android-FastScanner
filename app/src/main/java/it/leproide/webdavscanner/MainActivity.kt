@@ -24,6 +24,7 @@ import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import android.view.Menu
+import android.text.format.Formatter
 import android.text.method.LinkMovementMethod
 import android.view.MenuItem
 import android.widget.ScrollView
@@ -53,6 +54,7 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 import java.util.UUID
+import java.util.concurrent.TimeUnit
 
 /**
  * Main screen: two actions (upload to WebDAV or SMB, chosen in settings).
@@ -94,6 +96,8 @@ class MainActivity : AppCompatActivity() {
         }
 
         observeUploads()
+        // Automatic cleanup of old failed/orphan files and scanner leftovers.
+        lifecycleScope.launch { runCatching { Storage.cleanup(applicationContext) } }
         if (savedInstanceState == null) handleShortcut(intent)
     }
 
@@ -222,19 +226,50 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Removes finished jobs from the list and deletes local files of failed/cancelled ones. */
+    /** Removes finished jobs from the list and deletes local files of every finished job. */
     private fun clearFinished() {
         lifecycleScope.launch {
             val wm = WorkManager.getInstance(this@MainActivity)
             val infos = wm.getWorkInfosByTagFlow(UploadWorker.WORK_TAG).first()
-            val active = infos.filter { !it.state.isFinished }
-                .mapNotNull { i -> i.tags.firstOrNull { it.startsWith(UploadWorker.JOB_PREFIX) } }
-                .map { it.removePrefix(UploadWorker.JOB_PREFIX) }
-                .toSet()
+            val active = infos.filter { !it.state.isFinished }.mapNotNull { Storage.jobIdOf(it) }.toSet()
             withContext(Dispatchers.IO) {
-                File(filesDir, "pending").listFiles()?.filter { it.name !in active }?.forEach { it.deleteRecursively() }
+                Storage.pendingRoot(this@MainActivity).listFiles()
+                    ?.filter { it.name !in active }?.forEach { it.deleteRecursively() }
             }
+            Prefs.setDismissedJobs(this@MainActivity, emptySet())
             wm.pruneWork()
+        }
+    }
+
+    /** Failed upload: retry (files still on the phone), open settings, or delete it. */
+    private fun onFailedJob(jobId: String, label: String, error: String?) {
+        val hasFiles = Storage.jobHasFiles(this, jobId)
+        val b = MaterialAlertDialogBuilder(this)
+            .setTitle(label)
+            .setMessage(
+                (error ?: getString(R.string.state_failed)) + "\n\n" +
+                    getString(if (hasFiles) R.string.failed_kept else R.string.failed_gone,
+                        TimeUnit.MILLISECONDS.toDays(Storage.FAILED_RETENTION_MS))
+            )
+            .setNeutralButton(R.string.settings) { _, _ ->
+                startActivity(Intent(this, SettingsActivity::class.java))
+            }
+            .setNegativeButton(R.string.delete) { _, _ ->
+                Storage.deleteJob(this, jobId)
+                Prefs.setDismissedJobs(this, Prefs.dismissedJobs(this) + jobId)
+                refreshUploads()
+            }
+        if (hasFiles) b.setPositiveButton(R.string.retry) { _, _ ->
+            UploadWorker.enqueue(this, Storage.jobDir(this, jobId), label)
+        }
+        b.show()
+    }
+
+    private fun refreshUploads() {
+        lifecycleScope.launch {
+            renderUploads(
+                WorkManager.getInstance(this@MainActivity).getWorkInfosByTagFlow(UploadWorker.WORK_TAG).first()
+            )
         }
     }
 
@@ -293,16 +328,28 @@ class MainActivity : AppCompatActivity() {
 
     private fun renderUploads(infos: List<WorkInfo>) {
         listUploads.removeAllViews()
+        val dismissed = Prefs.dismissedJobs(this)
+        fun tag(i: WorkInfo, p: String) = i.tags.firstOrNull { it.startsWith(p) }?.removePrefix(p)
         val items = infos
-            .map { info -> (info.tags.firstOrNull { it.startsWith(UploadWorker.LABEL_PREFIX) }
-                ?.removePrefix(UploadWorker.LABEL_PREFIX) ?: "?") to info }
-            .sortedByDescending { it.first }
+            // A retried job has several records: keep only the newest one.
+            .groupBy { Storage.jobIdOf(it) ?: it.id.toString() }
+            .filterKeys { it !in dismissed }
+            .map { (job, list) -> job to list.maxBy { tag(it, UploadWorker.TIME_PREFIX)?.toLongOrNull() ?: 0L } }
+            .map { (job, info) -> Triple(job, tag(info, UploadWorker.LABEL_PREFIX) ?: "?", info) }
+            .sortedByDescending { it.second }
             .take(30)
+
+        // Space used on the phone by scans not uploaded yet.
+        val pending = Storage.pendingBytes(this)
+        if (pending > 0) {
+            listUploads.addView(row(getString(R.string.pending_space, Formatter.formatShortFileSize(this, pending))))
+        }
         if (items.isEmpty()) {
             listUploads.addView(row(getString(R.string.no_uploads)))
             return
         }
-        items.forEach { (label, info) ->
+        items.forEach { (job, label, info) ->
+            val error = info.outputData.getString(UploadWorker.KEY_ERROR)
             val state = when (info.state) {
                 WorkInfo.State.ENQUEUED ->
                     if (info.runAttemptCount > 0) getString(R.string.state_retry) else getString(R.string.state_enqueued)
@@ -310,16 +357,15 @@ class MainActivity : AppCompatActivity() {
                     (info.progress.getString(UploadWorker.KEY_PROGRESS)?.let { " $it" } ?: "")
                 WorkInfo.State.SUCCEEDED -> "✓ " + getString(R.string.state_succeeded)
                 WorkInfo.State.FAILED -> "✗ " + getString(R.string.state_failed) +
-                    (info.outputData.getString(UploadWorker.KEY_ERROR)?.let { ": $it" } ?: "")
+                    (error?.let { ": $it" } ?: "") + "\n" + getString(R.string.tap_for_options)
                 WorkInfo.State.CANCELLED -> getString(R.string.state_cancelled)
                 WorkInfo.State.BLOCKED -> getString(R.string.state_enqueued)
             }
             listUploads.addView(row("$label\n$state").apply {
                 if (info.state == WorkInfo.State.FAILED) {
-                    // Failed (e.g. certificate changed, wrong password): fix it in settings.
                     background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
                         .let { a -> a.getDrawable(0).also { a.recycle() } }
-                    setOnClickListener { startActivity(Intent(this@MainActivity, SettingsActivity::class.java)) }
+                    setOnClickListener { onFailedJob(job, label, error) }
                 }
             })
         }

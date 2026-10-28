@@ -107,4 +107,10 @@
     <string name="cert_expired">(EXPIRED)</string>
     <string name="cert_accept">Trust certificate</string>
     <string name="cert_accept_new">Accept new certificate</string>
+    <string name="pending_space">Waiting on the phone: %1$s</string>
+    <string name="tap_for_options">Tap for options</string>
+    <string name="retry">Retry</string>
+    <string name="delete">Delete</string>
+    <string name="failed_kept">The scan is still on the phone: you can retry after fixing the problem. It will be deleted automatically after %1$d days.</string>
+    <string name="failed_gone">The scan is no longer on the phone (deleted after %1$d days or manually).</string>
 </resources>

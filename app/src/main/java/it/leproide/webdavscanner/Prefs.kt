@@ -139,6 +139,14 @@ object Prefs {
             .apply()
     }
 
+    /** Failed jobs the user removed from the list (their files are already deleted). */
+    fun dismissedJobs(ctx: Context): Set<String> =
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getStringSet("dismissed", emptySet()).orEmpty()
+
+    fun setDismissedJobs(ctx: Context, ids: Set<String>) {
+        ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit().putStringSet("dismissed", ids).apply()
+    }
+
     /** Remembers the last base filename to guarantee uniqueness within the same second. */
     fun lastBaseName(ctx: Context): String? =
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).getString("lastBase", null)
