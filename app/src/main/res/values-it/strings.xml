@@ -16,7 +16,6 @@
     <string name="state_running">Caricamento…</string>
     <string name="state_succeeded">Caricato</string>
     <string name="state_failed">Errore</string>
-    <string name="state_retry">Nuovo tentativo</string>
     <string name="state_cancelled">Annullato</string>
     <string name="clear_finished">Pulisci elenco</string>
     <string name="section_server">Server WebDAV</string>
@@ -60,7 +59,6 @@
     <string name="smb_dfs_desc">Attiva se la condivisione è un namespace DFS di dominio</string>
     <string name="smb_auth_note">Autenticazione NTLMv2. Account locale: lascia vuoto il dominio. Account di dominio: compila il dominio (es. CONTOSO) oppure scrivi CONTOSO\\utente o utente@contoso.local. Kerberos non è disponibile su Android.</string>
     <string name="host_required">Host obbligatorio</string>
-    <string name="share_required">Condivisione obbligatoria</string>
     <string name="err_access_denied_http">Accesso negato (HTTP %1$d): controlla le credenziali</string>
     <string name="err_redirect">Il server reindirizza (HTTP %1$d): controlla http/https, porta e percorso</string>
     <string name="err_http">Errore HTTP %1$d</string>
@@ -109,4 +107,7 @@
     <string name="retry_all">Riprova tutti</string>
     <string name="retry_now">Riprova ora</string>
     <string name="state_retry_n">In riprova automatica (tentativo %1$d)</string>
+    <string name="clear_confirm_title">Caricamenti non completati</string>
+    <string name="clear_confirm_msg">%1$d caricamenti non sono ancora completati (in attesa, in riprova o in corso). Se prosegui verranno annullati e le scansioni eliminate dal telefono. Proseguire?</string>
+    <string name="clear_confirm_ok">Annulla ed elimina</string>
 </resources>

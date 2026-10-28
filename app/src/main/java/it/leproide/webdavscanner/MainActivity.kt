@@ -73,7 +73,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var listUploads: LinearLayout
     private lateinit var btnRetryAll: Button
 
-    /** Failed jobs whose files are still on the phone: (jobId, label). */
+    /** Failed / retrying jobs whose files are still on the phone: (jobId, label, newest record). */
     private var retryable: List<Triple<String, String, WorkInfo>> = emptyList()
 
     /** Jobs currently queued or running (newest record not finished). */
@@ -246,19 +246,55 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    /** Removes finished jobs from the list and deletes local files of every finished job. */
+    /**
+     * "Clear list". If uploads are still queued / retrying / running, asks for
+     * confirmation first: they are cancelled and their local files deleted.
+     */
     private fun clearFinished() {
         lifecycleScope.launch {
             val wm = WorkManager.getInstance(this@MainActivity)
             val infos = wm.getWorkInfosByTagFlow(UploadWorker.WORK_TAG).first()
-            val active = infos.filter { !it.state.isFinished }.mapNotNull { Storage.jobIdOf(it) }.toSet()
-            withContext(Dispatchers.IO) {
-                Storage.pendingRoot(this@MainActivity).listFiles()
-                    ?.filter { it.name !in active }?.forEach { it.deleteRecursively() }
+            // Not completed = queued / retrying / running, or failed with the scan still on the phone.
+            val newest = infos.groupBy { Storage.jobIdOf(it) }
+                .filterKeys { it != null }
+                .mapValues { (_, l) -> l.maxBy { i -> timeOf(i) } }
+            val pendingJobs = newest.filter { (job, info) ->
+                !info.state.isFinished ||
+                    (info.state == WorkInfo.State.FAILED && Storage.jobHasFiles(this@MainActivity, job!!))
+            }.keys
+            if (pendingJobs.isEmpty()) {
+                clearAll(cancelPending = false)
+                return@launch
             }
-            Prefs.setDismissedJobs(this@MainActivity, emptySet())
-            wm.pruneWork()
+            MaterialAlertDialogBuilder(this@MainActivity)
+                .setTitle(R.string.clear_confirm_title)
+                .setMessage(getString(R.string.clear_confirm_msg, pendingJobs.size))
+                .setPositiveButton(R.string.clear_confirm_ok) { _, _ ->
+                    lifecycleScope.launch { clearAll(cancelPending = true) }
+                }
+                .setNegativeButton(android.R.string.cancel, null)
+                .show()
         }
+    }
+
+    /** Empties the list and deletes local files ([cancelPending] = also not-completed uploads). */
+    private suspend fun clearAll(cancelPending: Boolean) {
+        val ctx = applicationContext
+        val wm = WorkManager.getInstance(ctx)
+        withContext(Dispatchers.IO) {
+            if (cancelPending) {
+                // Wait until the cancellation is applied, so pruneWork() removes those records too.
+                runCatching { wm.cancelAllWorkByTag(UploadWorker.WORK_TAG).result.get() }
+            }
+            val infos = wm.getWorkInfosByTagFlow(UploadWorker.WORK_TAG).first()
+            val stillActive = infos.filter { !it.state.isFinished }.mapNotNull { Storage.jobIdOf(it) }.toSet()
+            Storage.pendingRoot(ctx).listFiles()
+                ?.filter { it.name !in stillActive }
+                ?.forEach { Storage.deleteJob(ctx, it.name) }
+            Prefs.setDismissedJobs(ctx, emptySet())
+            runCatching { wm.pruneWork().result.get() }
+        }
+        retriedNow = emptySet()
     }
 
     /** Failed upload: retry (files still on the phone), open settings, or delete it. */
@@ -285,7 +321,6 @@ class MainActivity : AppCompatActivity() {
         b.show()
     }
 
-    /** Manual retry of a failed upload (files still on the phone). */
     /**
      * Manual retry. [waiting] = the job is in automatic retry (backoff): it is
      * cancelled and re-queued to run immediately.
@@ -373,7 +408,7 @@ class MainActivity : AppCompatActivity() {
             // A retried job has several records: keep only the newest one.
             .groupBy { Storage.jobIdOf(it) ?: it.id.toString() }
             .filterKeys { it !in dismissed }
-            .map { (job, list) -> job to list.maxBy { tag(it, UploadWorker.TIME_PREFIX)?.toLongOrNull() ?: 0L } }
+            .map { (job, list) -> job to list.maxBy { timeOf(it) } }
             .map { (job, info) -> Triple(job, tag(info, UploadWorker.LABEL_PREFIX) ?: "?", info) }
             .sortedByDescending { it.second }
             .take(30)
@@ -435,6 +470,11 @@ class MainActivity : AppCompatActivity() {
             listUploads.addView(line)
         }
     }
+
+    /** Enqueue time stored in the tags (0 for records created by older versions). */
+    private fun timeOf(i: WorkInfo): Long =
+        i.tags.firstOrNull { it.startsWith(UploadWorker.TIME_PREFIX) }
+            ?.removePrefix(UploadWorker.TIME_PREFIX)?.toLongOrNull() ?: 0L
 
     /** Failed, or waiting for the next automatic attempt after an error. */
     private fun canRetry(info: WorkInfo) =

@@ -17,7 +17,6 @@
     <string name="state_running">Uploading…</string>
     <string name="state_succeeded">Uploaded</string>
     <string name="state_failed">Error</string>
-    <string name="state_retry">Retrying</string>
     <string name="state_cancelled">Cancelled</string>
     <string name="clear_finished">Clear list</string>
     <string name="section_server">WebDAV server</string>
@@ -64,7 +63,6 @@
     <string name="smb_dfs_desc">Enable if the share is a domain DFS namespace</string>
     <string name="smb_auth_note">NTLMv2 authentication. Local account: leave the domain empty. Domain account: fill in the domain (e.g. CONTOSO) or type CONTOSO\\user or user@contoso.local. Kerberos is not available on Android.</string>
     <string name="host_required">Host is required</string>
-    <string name="share_required">Share is required</string>
     <string name="err_generic" translatable="false">%1$s</string>
     <string name="err_access_denied_http">Access denied (HTTP %1$d): check credentials</string>
     <string name="err_redirect">The server redirects (HTTP %1$d): check http/https, port and path</string>
@@ -115,4 +113,7 @@
     <string name="retry_all">Retry all</string>
     <string name="retry_now">Retry now</string>
     <string name="state_retry_n">Automatic retry (attempt %1$d)</string>
+    <string name="clear_confirm_title">Uploads not completed</string>
+    <string name="clear_confirm_msg">%1$d uploads are not completed yet (waiting, retrying or in progress). If you continue they will be cancelled and their scans deleted from the phone. Continue?</string>
+    <string name="clear_confirm_ok">Cancel and delete</string>
 </resources>

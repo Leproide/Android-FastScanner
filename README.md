@@ -52,7 +52,7 @@ Use **Prova connessione** to verify credentials and create the folder.
 - `http://` with credentials requires explicit confirmation (Basic auth would travel in clear text).
 - SMB: SMB1 disabled, signing required by default, optional mandatory SMB3 encryption.
 - Remote paths containing `.` / `..` are rejected; generated file names are sanitized.
-- Storage: scanner output is deleted from the cache as soon as it is queued; each local file is deleted right after its successful upload. Failed uploads keep their files for 3 days (tap the item → *Retry* / *Delete*), then they are deleted automatically. Orphan files and scanner leftovers are cleaned at every app start; *Clear list* deletes everything that is not waiting to upload.
+- Storage: scanner output is deleted from the cache as soon as it is queued; each local file is deleted right after its successful upload. Failed uploads keep their files for 3 days (tap the item → *Retry* / *Delete*), then they are deleted automatically. Orphan files and scanner leftovers are cleaned at every app start; *Clear list* asks for confirmation when uploads are not completed (queued, retrying, running or failed with the scan still on the phone), then cancels them and deletes their files.
 - User-installed CAs are trusted (to support private/corporate CAs); remove them from the device if not needed.
 
 ## Build

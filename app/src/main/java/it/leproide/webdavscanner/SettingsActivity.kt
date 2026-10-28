@@ -81,6 +81,9 @@ class SettingsActivity : AppCompatActivity() {
     /** false while the code itself flips the self-signed switch (keeps the new pin). */
     private var pinResetEnabled = true
 
+    /** A certificate was accepted in this screen: remind the user to Save. */
+    private var justPinned = false
+
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
         super.onCreate(savedInstanceState)
@@ -127,7 +130,7 @@ class SettingsActivity : AppCompatActivity() {
 
         // Toggling the self-signed option (or changing server) forgets the pinned certificate.
         swTrustAll.setOnCheckedChangeListener { _, _ ->
-            if (pinResetEnabled) { certPin = ""; txtResult.text = "" }
+            if (pinResetEnabled) { certPin = ""; justPinned = false; txtResult.text = "" }
         }
 
         findViewById<Button>(R.id.btnSave).setOnClickListener {
@@ -337,7 +340,9 @@ class SettingsActivity : AppCompatActivity() {
             when (error) {
                 null -> {
                     val dest = runCatching { Uploader.describe(cfg) }.getOrDefault("")
-                    txtResult.text = getString(R.string.test_ok, dest)
+                    var ok = getString(R.string.test_ok, dest)
+                    if (justPinned) ok += "\n\n" + getString(R.string.cert_trusted, cfg.certPin)
+                    txtResult.text = ok
                 }
                 is CertChangedException -> {
                     txtResult.text = getString(R.string.test_fail, error.localized(this@SettingsActivity))
@@ -378,6 +383,7 @@ class SettingsActivity : AppCompatActivity() {
                 swTrustAll.isChecked = true
                 pinResetEnabled = true
                 certPin = info.sha256
+                justPinned = true
                 txtResult.text = getString(R.string.cert_trusted, info.sha256)
                 testConnection() // verify with the pinned certificate
             }

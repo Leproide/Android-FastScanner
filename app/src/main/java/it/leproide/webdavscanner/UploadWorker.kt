@@ -28,6 +28,7 @@ import androidx.work.OneTimeWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.WorkerParameters
 import androidx.work.workDataOf
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -66,14 +67,19 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
                 Prefs.setJobError(applicationContext, jobDir.name, null)
                 Result.success(workDataOf(KEY_RESULT to up.destination))
             }
+        } catch (e: CancellationException) {
+            throw e // cancelled by the user ("Clear list" / "Retry now"): not an upload error
         } catch (e: UploadException) {
+            if (isStopped) return@withContext Result.failure()
             Log.w(TAG, "Upload failed", e)
             retryOrFail(jobDir, e, e.permanent)
         } catch (e: IOException) {
+            if (isStopped) return@withContext Result.failure()
             // Network / TLS / timeout: transient unless we've tried too often.
             Log.w(TAG, "Upload I/O error", e)
             retryOrFail(jobDir, e, false)
         } catch (e: Exception) {
+            if (isStopped) return@withContext Result.failure()
             Log.e(TAG, "Upload unexpected error", e)
             retryOrFail(jobDir, e, true)
         }
