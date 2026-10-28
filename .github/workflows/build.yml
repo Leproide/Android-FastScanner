@@ -1,14 +1,12 @@
-# FastScanner - CI build (debug + release APK)
+# FastScanner - CI build (debug + release APK), only on version tags or manual run
 # Copyright (C) 2026 - License: GPL-3.0
 # Author: https://github.com/Leproide
 name: Build APK
 
 on:
   push:
-    branches: [ main ]
-    tags: [ 'v*' ]
-  pull_request:
-  workflow_dispatch:
+    tags: [ 'v*' ]        # build + GitHub Release only when a version tag is pushed
+  workflow_dispatch:      # manual "Run workflow" button (APK in the run artifacts)
 
 permissions:
   contents: write
