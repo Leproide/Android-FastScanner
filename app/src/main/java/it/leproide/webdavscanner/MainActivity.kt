@@ -28,6 +28,9 @@ import android.text.format.Formatter
 import android.text.method.LinkMovementMethod
 import android.view.MenuItem
 import android.widget.ScrollView
+import android.view.Gravity
+import android.view.View
+import android.widget.Button
 import android.widget.LinearLayout
 import android.widget.TextView
 import android.widget.Toast
@@ -41,6 +44,7 @@ import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.repeatOnLifecycle
 import androidx.work.WorkInfo
 import androidx.work.WorkManager
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.mlkit.vision.documentscanner.GmsDocumentScannerOptions
 import com.google.mlkit.vision.documentscanner.GmsDocumentScanning
@@ -67,6 +71,13 @@ class MainActivity : AppCompatActivity() {
     private lateinit var scanLauncher: ActivityResultLauncher<IntentSenderRequest>
     private lateinit var txtTarget: TextView
     private lateinit var listUploads: LinearLayout
+    private lateinit var btnRetryAll: Button
+
+    /** Failed jobs whose files are still on the phone: (jobId, label). */
+    private var retryable: List<Pair<String, String>> = emptyList()
+
+    /** Jobs currently queued or running (newest record not finished). */
+    private var activeJobs: Set<String> = emptySet()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
@@ -89,6 +100,10 @@ class MainActivity : AppCompatActivity() {
         findViewById<android.view.View>(R.id.cardSingle).setOnClickListener { startScan(multi = false) }
         findViewById<android.view.View>(R.id.cardMulti).setOnClickListener { startScan(multi = true) }
         findViewById<android.view.View>(R.id.btnClear).setOnClickListener { clearFinished() }
+        btnRetryAll = findViewById(R.id.btnRetryAll)
+        btnRetryAll.setOnClickListener {
+            retryable.forEach { (job, label) -> retryJob(job, label) }
+        }
         findViewById<TextView>(R.id.txtCredits).apply {
             val version = runCatching { packageManager.getPackageInfo(packageName, 0).versionName }.getOrNull() ?: ""
             text = getString(R.string.credits_footer, version)
@@ -259,10 +274,17 @@ class MainActivity : AppCompatActivity() {
                 Prefs.setDismissedJobs(this, Prefs.dismissedJobs(this) + jobId)
                 refreshUploads()
             }
-        if (hasFiles) b.setPositiveButton(R.string.retry) { _, _ ->
-            UploadWorker.enqueue(this, Storage.jobDir(this, jobId), label)
-        }
+        if (hasFiles) b.setPositiveButton(R.string.retry) { _, _ -> retryJob(jobId, label) }
         b.show()
+    }
+
+    /** Manual retry of a failed upload (files still on the phone). */
+    private fun retryJob(jobId: String, label: String) {
+        // Ignore double taps: the job is already queued/running again.
+        if (jobId in activeJobs || !Storage.jobHasFiles(this, jobId)) return
+        activeJobs = activeJobs + jobId
+        UploadWorker.enqueue(this, Storage.jobDir(this, jobId), label)
+        Toast.makeText(this, getString(R.string.queued, label), Toast.LENGTH_SHORT).show()
     }
 
     private fun refreshUploads() {
@@ -344,6 +366,11 @@ class MainActivity : AppCompatActivity() {
         if (pending > 0) {
             listUploads.addView(row(getString(R.string.pending_space, Formatter.formatShortFileSize(this, pending))))
         }
+        activeJobs = items.filter { !it.third.state.isFinished }.map { it.first }.toSet()
+        retryable = items
+            .filter { it.third.state == WorkInfo.State.FAILED && Storage.jobHasFiles(this, it.first) }
+            .map { it.first to it.second }
+        btnRetryAll.visibility = if (retryable.size > 1) View.VISIBLE else View.GONE
         if (items.isEmpty()) {
             listUploads.addView(row(getString(R.string.no_uploads)))
             return
@@ -357,17 +384,34 @@ class MainActivity : AppCompatActivity() {
                     (info.progress.getString(UploadWorker.KEY_PROGRESS)?.let { " $it" } ?: "")
                 WorkInfo.State.SUCCEEDED -> "✓ " + getString(R.string.state_succeeded)
                 WorkInfo.State.FAILED -> "✗ " + getString(R.string.state_failed) +
-                    (error?.let { ": $it" } ?: "") + "\n" + getString(R.string.tap_for_options)
+                    (error?.let { ": $it" } ?: "")
                 WorkInfo.State.CANCELLED -> getString(R.string.state_cancelled)
                 WorkInfo.State.BLOCKED -> getString(R.string.state_enqueued)
             }
-            listUploads.addView(row("$label\n$state").apply {
-                if (info.state == WorkInfo.State.FAILED) {
-                    background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
-                        .let { a -> a.getDrawable(0).also { a.recycle() } }
-                    setOnClickListener { onFailedJob(job, label, error) }
-                }
-            })
+            val text = row("$label\n$state")
+            if (info.state != WorkInfo.State.FAILED) {
+                listUploads.addView(text)
+                return@forEach
+            }
+            // Failed: text opens the options dialog, visible "Retry" button when files are still here.
+            text.layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+            text.background = obtainStyledAttributes(intArrayOf(android.R.attr.selectableItemBackground))
+                .let { a -> a.getDrawable(0).also { a.recycle() } }
+            text.setOnClickListener { onFailedJob(job, label, error) }
+            val line = LinearLayout(this).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+                addView(text)
+            }
+            if (Storage.jobHasFiles(this, job)) {
+                line.addView(
+                    MaterialButton(this).apply {
+                        setText(R.string.retry)
+                        setOnClickListener { retryJob(job, label) }
+                    }
+                )
+            }
+            listUploads.addView(line)
         }
     }
 
