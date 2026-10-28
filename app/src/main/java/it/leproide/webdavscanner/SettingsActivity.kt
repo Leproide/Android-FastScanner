@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -19,6 +19,7 @@
 package it.leproide.webdavscanner
 
 import android.os.Bundle
+import android.view.View
 import android.widget.Button
 import android.widget.EditText
 import android.widget.RadioGroup
@@ -31,20 +32,47 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-/** WebDAV server, credentials, output format and scanner options. */
+/**
+ * Destination (WebDAV OR SMB, mutually exclusive toggles), credentials,
+ * output format and scanner options.
+ */
 class SettingsActivity : AppCompatActivity() {
 
+    // Protocol toggles + sections
+    private lateinit var swWebdav: MaterialSwitch
+    private lateinit var swSmb: MaterialSwitch
+    private lateinit var sectionWebdav: View
+    private lateinit var sectionSmb: View
+
+    // WebDAV
     private lateinit var edtServer: EditText
     private lateinit var edtPort: EditText
     private lateinit var edtPath: EditText
     private lateinit var edtUser: EditText
     private lateinit var edtPass: EditText
-    private lateinit var edtPrefix: EditText
     private lateinit var swTrustAll: MaterialSwitch
+
+    // SMB
+    private lateinit var edtSmbHost: EditText
+    private lateinit var edtSmbPort: EditText
+    private lateinit var edtSmbShare: EditText
+    private lateinit var edtSmbPath: EditText
+    private lateinit var edtSmbDomain: EditText
+    private lateinit var edtSmbUser: EditText
+    private lateinit var edtSmbPass: EditText
+    private lateinit var swSmbSigning: MaterialSwitch
+    private lateinit var swSmbEncrypt: MaterialSwitch
+    private lateinit var swSmbDfs: MaterialSwitch
+
+    // Output / scanner
+    private lateinit var edtPrefix: EditText
     private lateinit var swGallery: MaterialSwitch
     private lateinit var rgFormat: RadioGroup
     private lateinit var rgMode: RadioGroup
     private lateinit var txtResult: TextView
+
+    /** Guards against listener recursion while flipping the paired switch. */
+    private var syncing = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         enableInsetsAwareLayout()
@@ -53,19 +81,42 @@ class SettingsActivity : AppCompatActivity() {
         setupToolbarAndInsets(findViewById(R.id.root), findViewById(R.id.toolbar))
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
+        swWebdav = findViewById(R.id.swWebdav)
+        swSmb = findViewById(R.id.swSmb)
+        sectionWebdav = findViewById(R.id.sectionWebdav)
+        sectionSmb = findViewById(R.id.sectionSmb)
+
         edtServer = findViewById(R.id.edtServer)
         edtPort = findViewById(R.id.edtPort)
         edtPath = findViewById(R.id.edtPath)
         edtUser = findViewById(R.id.edtUser)
         edtPass = findViewById(R.id.edtPass)
-        edtPrefix = findViewById(R.id.edtPrefix)
         swTrustAll = findViewById(R.id.swTrustAll)
+
+        edtSmbHost = findViewById(R.id.edtSmbHost)
+        edtSmbPort = findViewById(R.id.edtSmbPort)
+        edtSmbShare = findViewById(R.id.edtSmbShare)
+        edtSmbPath = findViewById(R.id.edtSmbPath)
+        edtSmbDomain = findViewById(R.id.edtSmbDomain)
+        edtSmbUser = findViewById(R.id.edtSmbUser)
+        edtSmbPass = findViewById(R.id.edtSmbPass)
+        swSmbSigning = findViewById(R.id.swSmbSigning)
+        swSmbEncrypt = findViewById(R.id.swSmbEncrypt)
+        swSmbDfs = findViewById(R.id.swSmbDfs)
+
+        edtPrefix = findViewById(R.id.edtPrefix)
         swGallery = findViewById(R.id.swGallery)
         rgFormat = findViewById(R.id.rgFormat)
         rgMode = findViewById(R.id.rgMode)
         txtResult = findViewById(R.id.txtTestResult)
 
         if (savedInstanceState == null) fill(Prefs.load(this))
+
+        // Exactly one protocol active: turning one on turns the other off,
+        // turning the active one off switches to the other.
+        swWebdav.setOnCheckedChangeListener { _, on -> selectProtocol(if (on) Protocol.WEBDAV else Protocol.SMB) }
+        swSmb.setOnCheckedChangeListener { _, on -> selectProtocol(if (on) Protocol.SMB else Protocol.WEBDAV) }
+        updateSections()
 
         findViewById<Button>(R.id.btnSave).setOnClickListener {
             readForm()?.let {
@@ -82,14 +133,49 @@ class SettingsActivity : AppCompatActivity() {
         return true
     }
 
+    private fun selectedProtocol() = if (swSmb.isChecked) Protocol.SMB else Protocol.WEBDAV
+
+    private fun selectProtocol(p: Protocol) {
+        if (syncing) return
+        syncing = true
+        swWebdav.isChecked = p == Protocol.WEBDAV
+        swSmb.isChecked = p == Protocol.SMB
+        syncing = false
+        updateSections()
+        txtResult.text = ""
+    }
+
+    private fun updateSections() {
+        val smb = selectedProtocol() == Protocol.SMB
+        sectionSmb.visibility = if (smb) View.VISIBLE else View.GONE
+        sectionWebdav.visibility = if (smb) View.GONE else View.VISIBLE
+    }
+
     private fun fill(c: Config) {
+        syncing = true
+        swWebdav.isChecked = c.protocol == Protocol.WEBDAV
+        swSmb.isChecked = c.protocol == Protocol.SMB
+        syncing = false
+
         edtServer.setText(c.server)
         edtPort.setText(c.port?.toString() ?: "")
         edtPath.setText(c.remotePath)
         edtUser.setText(c.username)
         edtPass.setText(c.password)
-        edtPrefix.setText(c.prefix)
         swTrustAll.isChecked = c.trustAll
+
+        edtSmbHost.setText(c.smbHost)
+        edtSmbPort.setText(c.smbPort?.toString() ?: "")
+        edtSmbShare.setText(c.smbShare)
+        edtSmbPath.setText(c.smbPath)
+        edtSmbDomain.setText(c.smbDomain)
+        edtSmbUser.setText(c.smbUser)
+        edtSmbPass.setText(c.smbPassword)
+        swSmbSigning.isChecked = c.smbSigning
+        swSmbEncrypt.isChecked = c.smbEncrypt
+        swSmbDfs.isChecked = c.smbDfs
+
+        edtPrefix.setText(c.prefix)
         swGallery.isChecked = c.galleryImport
         rgFormat.check(
             when (c.format) {
@@ -107,24 +193,56 @@ class SettingsActivity : AppCompatActivity() {
         )
     }
 
-    /** Validates the form; returns null (with field error) if invalid. */
+    /** Parses an optional port field; returns Result.failure on invalid input. */
+    private fun readPort(e: EditText): kotlin.Result<Int?> {
+        val txt = e.text.toString().trim()
+        if (txt.isEmpty()) return kotlin.Result.success(null)
+        val p = txt.toIntOrNull()?.takeIf { it in 1..65535 }
+        if (p == null) {
+            e.error = "1-65535"
+            return kotlin.Result.failure(IllegalArgumentException())
+        }
+        return kotlin.Result.success(p)
+    }
+
+    /**
+     * Validates the form (only the active protocol's fields are mandatory);
+     * returns null and shows a field error if invalid.
+     */
     private fun readForm(): Config? {
-        val server = edtServer.text.toString().trim()
-        if (server.isEmpty()) {
-            edtServer.error = getString(R.string.server_url); return null
+        val protocol = selectedProtocol()
+        val port = readPort(edtPort).getOrElse { if (protocol == Protocol.WEBDAV) return null else null }
+        val smbPort = readPort(edtSmbPort).getOrElse { if (protocol == Protocol.SMB) return null else null }
+
+        when (protocol) {
+            Protocol.WEBDAV -> if (edtServer.text.isNullOrBlank()) {
+                edtServer.error = getString(R.string.server_url); return null
+            }
+            Protocol.SMB -> {
+                if (edtSmbHost.text.isNullOrBlank()) {
+                    edtSmbHost.error = getString(R.string.host_required); return null
+                }
+            }
         }
-        val portTxt = edtPort.text.toString().trim()
-        val port = if (portTxt.isEmpty()) null else portTxt.toIntOrNull()?.takeIf { it in 1..65535 }
-        if (portTxt.isNotEmpty() && port == null) {
-            edtPort.error = "1-65535"; return null
-        }
+
         val cfg = Config(
-            server = server,
+            protocol = protocol,
+            server = edtServer.text.toString().trim(),
             port = port,
             remotePath = edtPath.text.toString().trim().ifEmpty { "/" },
             username = edtUser.text.toString(),
             password = edtPass.text.toString(),
             trustAll = swTrustAll.isChecked,
+            smbHost = edtSmbHost.text.toString().trim(),
+            smbPort = smbPort,
+            smbShare = edtSmbShare.text.toString().trim(),
+            smbPath = edtSmbPath.text.toString().trim(),
+            smbDomain = edtSmbDomain.text.toString().trim(),
+            smbUser = edtSmbUser.text.toString().trim(),
+            smbPassword = edtSmbPass.text.toString(),
+            smbSigning = swSmbSigning.isChecked,
+            smbEncrypt = swSmbEncrypt.isChecked,
+            smbDfs = swSmbDfs.isChecked,
             format = when (rgFormat.checkedRadioButtonId) {
                 R.id.rbJpg -> OutputFormat.JPG
                 R.id.rbBoth -> OutputFormat.BOTH
@@ -138,9 +256,17 @@ class SettingsActivity : AppCompatActivity() {
             },
             galleryImport = swGallery.isChecked,
         )
-        // Validate URL early so the user is not surprised at upload time.
+
+        // Validate the destination early so the user is not surprised at upload time.
         return try {
-            WebDavClient.buildBaseUrl(cfg); cfg
+            when (protocol) {
+                Protocol.WEBDAV -> WebDavClient.buildBaseUrl(cfg)
+                Protocol.SMB -> SmbUploader.parseTarget(cfg)
+            }
+            cfg
+        } catch (e: UploadException) {
+            // SMB: missing share
+            edtSmbShare.error = e.message; null
         } catch (e: IllegalArgumentException) {
             edtServer.error = e.message; null
         }
@@ -152,7 +278,7 @@ class SettingsActivity : AppCompatActivity() {
         lifecycleScope.launch {
             val msg = withContext(Dispatchers.IO) {
                 try {
-                    getString(R.string.test_ok, WebDavClient(cfg).test())
+                    Uploader.forConfig(cfg).use { getString(R.string.test_ok, it.test()) }
                 } catch (e: Exception) {
                     getString(R.string.test_fail, e.message ?: e.javaClass.simpleName)
                 }

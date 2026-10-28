@@ -1,6 +1,6 @@
-# WebDAV Scanner
+# FastScanner
 
-Android document scanner that uploads straight to a WebDAV server — no file-name prompt, no extra questions.
+Android document scanner that uploads straight to a **WebDAV** server **or** an **SMB (SMB2/SMB3)** network share — no file-name prompt, no extra questions.
 
 ## Features
 
@@ -12,6 +12,12 @@ Android document scanner that uploads straight to a WebDAV server — no file-na
 - **Output format** (settings): PDF, JPG, or both. Multi-page JPGs are named `..._01.jpg`, `..._02.jpg`.
 - **Reliable upload queue** (WorkManager): waits for network, retries with backoff, survives app close/reboot; live status on the main screen.
 - **WebDAV**: server URL, port, remote folder (created automatically if missing), Basic auth, password encrypted with Android Keystore, optional "accept self-signed certificates", http allowed for LAN/NAS.
+- **SMB2 / SMB3** (alternative to WebDAV, selected with a toggle in settings):
+  - dialects SMB 3.1.1 → 2.0.2 only (SMB1 never used), message signing required by default, optional mandatory SMB3 AES encryption, optional DFS;
+  - **local accounts**: user + password, domain empty;
+  - **domain accounts**: domain field (e.g. `CONTOSO`), or `CONTOSO\user`, or UPN `user@contoso.local`;
+  - authentication NTLMv2 (Kerberos is not available on Android);
+  - target folder tree created automatically, files created with `FILE_CREATE` so nothing is ever overwritten.
 - **Launcher shortcuts**: long-press the icon → *Scansione singola* / *Scansione multipla* to open the camera directly.
 
 ## Settings examples
@@ -23,6 +29,15 @@ Android document scanner that uploads straight to a WebDAV server — no file-na
 | Synology (WebDAV pkg) | `https://nas.local` port `5006` | `/home/Scans` |
 | Apache / nginx | `http://192.168.1.10` port `8080` | `/dav/scans` |
 
+### SMB examples
+
+| Case | Host | Share | Subfolder | Domain | User |
+|---|---|---|---|---|---|
+| NAS, local account | `192.168.1.10` | `Scansioni` | | | `mario` |
+| Windows PC, local account | `PC-UFFICIO` | `Scan` | `In` | | `mario` |
+| File server, domain account | `fs01.contoso.local` | `Dati` | `Scansioni/2026` | `CONTOSO` | `mario` |
+| Pasted UNC path | `\\fs01\Dati\Scansioni` | | | | `CONTOSO\mario` |
+
 Use **Prova connessione** to verify credentials and create the folder.
 
 ## Build
@@ -30,7 +45,7 @@ Use **Prova connessione** to verify credentials and create the folder.
 Requirements: JDK 17, Android SDK 35 (Android Studio Ladybug or newer).
 
 ```bash
-./gradlew assembleRelease     # app/build/outputs/apk/release/app-release.apk
+./gradlew assembleRelease     # app/build/outputs/apk/release/FastScanner-<version>-release.apk
 ```
 
 Or push the repo to GitHub: the included workflow (`.github/workflows/build.yml`) builds debug and release APKs and attaches them as artifacts (and to a GitHub Release when you push a `v*` tag).

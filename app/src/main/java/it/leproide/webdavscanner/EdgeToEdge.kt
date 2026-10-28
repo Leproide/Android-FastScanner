@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *

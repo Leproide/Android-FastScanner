@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<!-- FastScanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
 <resources>
-    <string name="app_name">WebDAV Scanner</string>
+    <string name="app_name">FastScanner</string>
     <string name="settings">Impostazioni</string>
     <string name="scan_single">Scansione singola</string>
     <string name="scan_single_desc">Inquadra, scatta, conferma: caricamento immediato</string>
@@ -9,7 +9,7 @@
     <string name="scan_multi_desc">Scatta tutte le pagine che vuoi, poi Fine per inviare</string>
     <string name="recent_uploads">Caricamenti recenti</string>
     <string name="no_uploads">Nessun caricamento</string>
-    <string name="not_configured">Configura il server WebDAV nelle impostazioni</string>
+    <string name="not_configured">Configura la destinazione (WebDAV o SMB) nelle impostazioni</string>
     <string name="target">Destinazione: %1$s</string>
     <string name="queued">In coda: %1$s</string>
     <string name="scanner_error">Errore scanner: %1$s</string>
@@ -47,4 +47,23 @@
     <string name="testing">Verifica in corso…</string>
     <string name="test_ok">Connessione OK: %1$s</string>
     <string name="test_fail">Errore: %1$s</string>
+    <string name="section_protocol">Destinazione</string>
+    <string name="use_webdav">Usa WebDAV</string>
+    <string name="use_smb">Usa SMB (cartella di rete Windows/NAS)</string>
+    <string name="section_smb">Server SMB (SMB2 / SMB3)</string>
+    <string name="smb_host">Host (es. nas, 192.168.1.10 o \\\\server\\share)</string>
+    <string name="smb_port">Porta (vuoto = 445)</string>
+    <string name="smb_share">Condivisione (es. Scansioni)</string>
+    <string name="smb_path">Sottocartella (opzionale, es. Ufficio/2026)</string>
+    <string name="smb_domain">Dominio (vuoto = account locale)</string>
+    <string name="smb_user">Utente (anche DOMINIO\\utente o utente@dominio.local)</string>
+    <string name="smb_signing">Firma SMB obbligatoria</string>
+    <string name="smb_signing_desc">Protegge dall\'alterazione dei dati; richiesta dai controller di dominio</string>
+    <string name="smb_encrypt">Crittografia SMB3 obbligatoria</string>
+    <string name="smb_encrypt_desc">Cifra il traffico (AES); il server deve supportare SMB 3.x</string>
+    <string name="smb_dfs">Supporto DFS</string>
+    <string name="smb_dfs_desc">Attiva se la condivisione è un namespace DFS di dominio</string>
+    <string name="smb_auth_note">Autenticazione NTLMv2. Account locale: lascia vuoto il dominio. Account di dominio: compila il dominio (es. CONTOSO) oppure scrivi CONTOSO\\utente o utente@contoso.local. Kerberos non è disponibile su Android.</string>
+    <string name="host_required">Host obbligatorio</string>
+    <string name="share_required">Condivisione obbligatoria</string>
 </resources>

@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -37,9 +37,8 @@ import javax.net.ssl.TrustManager
 import javax.net.ssl.X509TrustManager
 
 /** Thrown for HTTP errors; [permanent] = retrying will not help (auth, bad path...). */
-class WebDavException(val code: Int, msg: String) : IOException(msg) {
-    val permanent: Boolean get() = code in 400..499 && code != 408 && code != 429
-}
+class WebDavException(val code: Int, msg: String) :
+    UploadException(msg, permanent = code in 400..499 && code != 408 && code != 429)
 
 /** Minimal WebDAV client: PROPFIND (check), MKCOL (create dirs), PUT (upload). */
 class WebDavClient(private val cfg: Config) {

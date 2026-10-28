@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner - root build.gradle.kts
+ * FastScanner - root build.gradle.kts
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *

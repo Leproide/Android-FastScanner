@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner - app/build.gradle.kts
+ * FastScanner - app/build.gradle.kts
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -29,8 +29,8 @@ android {
         applicationId = "it.leproide.webdavscanner"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
     }
 
     buildTypes {
@@ -54,6 +54,24 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+
+    packaging {
+        resources {
+            // Duplicate metadata shipped by BouncyCastle / smbj dependencies
+            excludes += setOf(
+                "META-INF/versions/9/OSGI-INF/MANIFEST.MF",
+                "META-INF/DEPENDENCIES",
+                "META-INF/LICENSE*",
+                "META-INF/NOTICE*",
+                "META-INF/INDEX.LIST"
+            )
+        }
+    }
+}
+
+// APK file name: FastScanner-<version>-<buildType>.apk
+base {
+    archivesName.set("FastScanner-${android.defaultConfig.versionName}")
 }
 
 dependencies {
@@ -68,4 +86,8 @@ dependencies {
     // perspective correction, filters, shadow/stain/finger removal.
     implementation("com.google.android.gms:play-services-mlkit-document-scanner:16.0.0")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.9.0")
+    // SMB2/SMB3 client (NTLMv2 auth, signing, SMB 3.x AES encryption). Pure Java, no SMB1.
+    implementation("com.hierynomus:smbj:0.13.0")
+    // Newer BouncyCastle than the one smbj pulls (1.75): crypto for NTLM (MD4) and SMB3 AES-CMAC/GCM/CCM.
+    implementation("org.bouncycastle:bcprov-jdk18on:1.78.1")
 }

@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -35,20 +35,41 @@ enum class OutputFormat { PDF, JPG, BOTH }
 /** Values mirror GmsDocumentScannerOptions.SCANNER_MODE_* (FULL=1, BASE_WITH_FILTER=2, BASE=3). */
 enum class ScanMode { FULL, FILTER, BASE }
 
+/** Upload back-end: exactly one is active. */
+enum class Protocol { WEBDAV, SMB }
+
 /** Immutable snapshot of the user configuration. */
 data class Config(
+    val protocol: Protocol,
+    // --- WebDAV ---
     val server: String,
     val port: Int?,          // null = scheme default
     val remotePath: String,
     val username: String,
     val password: String,
     val trustAll: Boolean,
+    // --- SMB2/3 ---
+    val smbHost: String,
+    val smbPort: Int?,       // null = 445
+    val smbShare: String,
+    val smbPath: String,
+    val smbDomain: String,   // empty = local account
+    val smbUser: String,
+    val smbPassword: String,
+    val smbSigning: Boolean,
+    val smbEncrypt: Boolean,
+    val smbDfs: Boolean,
+    // --- Output / scanner ---
     val format: OutputFormat,
     val prefix: String,
     val mode: ScanMode,
     val galleryImport: Boolean,
 ) {
-    val isConfigured: Boolean get() = server.isNotBlank()
+    val isConfigured: Boolean
+        get() = when (protocol) {
+            Protocol.WEBDAV -> server.isNotBlank()
+            Protocol.SMB -> smbHost.isNotBlank()
+        }
 }
 
 /**
@@ -62,12 +83,24 @@ object Prefs {
     fun load(ctx: Context): Config {
         val p = ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         return Config(
+            protocol = runCatching { Protocol.valueOf(p.getString("protocol", "WEBDAV")!!) }
+                .getOrDefault(Protocol.WEBDAV),
             server = p.getString("server", "") ?: "",
             port = p.getInt("port", -1).takeIf { it in 1..65535 },
             remotePath = p.getString("path", "/") ?: "/",
             username = p.getString("user", "") ?: "",
             password = p.getString("pass", null)?.let { Crypto.decrypt(it) } ?: "",
             trustAll = p.getBoolean("trustAll", false),
+            smbHost = p.getString("smbHost", "") ?: "",
+            smbPort = p.getInt("smbPort", -1).takeIf { it in 1..65535 },
+            smbShare = p.getString("smbShare", "") ?: "",
+            smbPath = p.getString("smbPath", "") ?: "",
+            smbDomain = p.getString("smbDomain", "") ?: "",
+            smbUser = p.getString("smbUser", "") ?: "",
+            smbPassword = p.getString("smbPass", null)?.let { Crypto.decrypt(it) } ?: "",
+            smbSigning = p.getBoolean("smbSigning", true),
+            smbEncrypt = p.getBoolean("smbEncrypt", false),
+            smbDfs = p.getBoolean("smbDfs", false),
             format = runCatching { OutputFormat.valueOf(p.getString("format", "PDF")!!) }
                 .getOrDefault(OutputFormat.PDF),
             prefix = p.getString("prefix", "scan_") ?: "scan_",
@@ -79,12 +112,23 @@ object Prefs {
 
     fun save(ctx: Context, c: Config) {
         ctx.getSharedPreferences(FILE, Context.MODE_PRIVATE).edit()
+            .putString("protocol", c.protocol.name)
             .putString("server", c.server.trim())
             .putInt("port", c.port ?: -1)
             .putString("path", c.remotePath.trim().ifEmpty { "/" })
             .putString("user", c.username)
             .putString("pass", Crypto.encrypt(c.password))
             .putBoolean("trustAll", c.trustAll)
+            .putString("smbHost", c.smbHost.trim())
+            .putInt("smbPort", c.smbPort ?: -1)
+            .putString("smbShare", c.smbShare.trim())
+            .putString("smbPath", c.smbPath.trim())
+            .putString("smbDomain", c.smbDomain.trim())
+            .putString("smbUser", c.smbUser.trim())
+            .putString("smbPass", Crypto.encrypt(c.smbPassword))
+            .putBoolean("smbSigning", c.smbSigning)
+            .putBoolean("smbEncrypt", c.smbEncrypt)
+            .putBoolean("smbDfs", c.smbDfs)
             .putString("format", c.format.name)
             .putString("prefix", c.prefix)
             .putString("mode", c.mode.name)

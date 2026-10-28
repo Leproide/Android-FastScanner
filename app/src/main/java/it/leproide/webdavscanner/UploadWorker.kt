@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -35,7 +35,7 @@ import java.io.IOException
 import java.util.concurrent.TimeUnit
 
 /**
- * Uploads every file of one scan job (directory under filesDir/pending/<job>).
+ * Uploads (WebDAV or SMB) every file of one scan job (directory under filesDir/pending/<job>).
  * Survives app close / reboot; waits for network; retries with backoff.
  * Each local file is deleted right after its successful upload, so a retry
  * only re-sends what is still missing.
@@ -54,18 +54,20 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         if (!cfg.isConfigured) return@withContext fail("Server non configurato")
 
         try {
-            val dav = WebDavClient(cfg)
-            dav.ensureDirectory()
-            files.forEachIndexed { i, f ->
-                setProgress(workDataOf(KEY_PROGRESS to "${i + 1}/${files.size}"))
-                uploadUnique(dav, f)
-                f.delete()
+            // Back-end chosen in settings (WebDAV or SMB) at upload time.
+            Uploader.forConfig(cfg).use { up ->
+                up.prepare()
+                files.forEachIndexed { i, f ->
+                    setProgress(workDataOf(KEY_PROGRESS to "${i + 1}/${files.size}"))
+                    uploadUnique(up, f)
+                    f.delete()
+                }
+                jobDir.delete()
+                Result.success(workDataOf(KEY_RESULT to up.destination))
             }
-            jobDir.delete()
-            Result.success(workDataOf(KEY_RESULT to dav.baseUrl.toString()))
-        } catch (e: WebDavException) {
+        } catch (e: UploadException) {
             Log.w(TAG, "Upload failed", e)
-            if (e.permanent || runAttemptCount >= MAX_ATTEMPTS) fail(e.message ?: "HTTP ${e.code}")
+            if (e.permanent || runAttemptCount >= MAX_ATTEMPTS) fail(e.message ?: "Errore")
             else Result.retry()
         } catch (e: IOException) {
             // Network / TLS / timeout: transient unless we've tried too often.
@@ -77,8 +79,8 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         }
     }
 
-    /** PUT with If-None-Match: on 412 (already exists) append -2, -3 ... never overwrite. */
-    private fun uploadUnique(dav: WebDavClient, f: File) {
+    /** Never overwrite: if the name exists append -2, -3 ... */
+    private fun uploadUnique(up: Uploader, f: File) {
         val dot = f.name.lastIndexOf('.')
         val stem = if (dot > 0) f.name.substring(0, dot) else f.name
         val ext = if (dot > 0) f.name.substring(dot) else ""
@@ -87,10 +89,10 @@ class UploadWorker(ctx: Context, params: WorkerParameters) : CoroutineWorker(ctx
         while (true) {
             val name = if (n == 1) f.name else "$stem-$n$ext"
             try {
-                dav.put(f, name, mime)
+                up.upload(f, name, mime)
                 return
-            } catch (e: WebDavException) {
-                if (e.code != 412 || n >= 50) throw e
+            } catch (e: AlreadyExistsException) {
+                if (n >= 50) throw UploadException("Troppi file con lo stesso nome", permanent = true)
                 n++
             }
         }

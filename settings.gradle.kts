@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner - settings.gradle.kts
+ * FastScanner - settings.gradle.kts
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -32,5 +32,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "WebDavScanner"
+rootProject.name = "FastScanner"
 include(":app")

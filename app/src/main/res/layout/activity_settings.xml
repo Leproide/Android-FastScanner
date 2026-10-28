@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- WebDAV Scanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
+<!-- FastScanner - Copyright (C) 2026 - License: GPL-3.0 - Author: https://github.com/Leproide -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/root" android:layout_width="match_parent" android:layout_height="match_parent"
     android:orientation="vertical">
@@ -14,47 +14,132 @@
         android:orientation="vertical" android:padding="16dp">
 
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" android:text="@string/section_server"
+            android:layout_marginTop="0dp" android:layout_marginBottom="8dp" android:text="@string/section_protocol"
             android:textAppearance="?attr/textAppearanceTitleMedium"/>
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/server_url">
-            <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtServer"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:inputType="textUri" android:maxLines="1"/>
-        </com.google.android.material.textfield.TextInputLayout>
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/port">
-            <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPort"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:inputType="number" android:maxLines="1"/>
-        </com.google.android.material.textfield.TextInputLayout>
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/remote_path">
-            <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPath"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:inputType="textUri" android:maxLines="1"/>
-        </com.google.android.material.textfield.TextInputLayout>
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/username">
-            <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtUser"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:inputType="text|textNoSuggestions" android:maxLines="1"/>
-        </com.google.android.material.textfield.TextInputLayout>
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
-            android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/password" app:endIconMode="password_toggle">
-            <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPass"
-                android:layout_width="match_parent" android:layout_height="wrap_content"
-                android:inputType="textPassword" android:maxLines="1"/>
-        </com.google.android.material.textfield.TextInputLayout>
-        <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swTrustAll"
+        <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swWebdav"
             android:layout_width="match_parent" android:layout_height="wrap_content"
-            android:text="@string/trust_all"/>
+            android:text="@string/use_webdav"/>
+        <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swSmb"
+            android:layout_width="match_parent" android:layout_height="wrap_content"
+            android:layout_marginBottom="8dp" android:text="@string/use_smb"/>
+
+        <!-- ===== WebDAV ===== -->
+        <LinearLayout android:id="@+id/sectionWebdav" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical">
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginBottom="16dp" android:text="@string/trust_all_desc"
-            android:textAppearance="?attr/textAppearanceBodySmall"/>
+            android:layout_marginTop="8dp" android:layout_marginBottom="8dp" android:text="@string/section_server"
+            android:textAppearance="?attr/textAppearanceTitleMedium"/>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/server_url">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtServer"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textUri" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/port">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPort"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="number" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/remote_path">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPath"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textUri" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/username">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtUser"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="text|textNoSuggestions" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/password" app:endIconMode="password_toggle">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtPass"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textPassword" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swTrustAll"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/trust_all"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" android:text="@string/trust_all_desc"
+                android:textAppearance="?attr/textAppearanceBodySmall"/>
+        </LinearLayout>
+
+        <!-- ===== SMB2/3 ===== -->
+        <LinearLayout android:id="@+id/sectionSmb" android:layout_width="match_parent"
+            android:layout_height="wrap_content" android:orientation="vertical">
+        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" android:layout_marginBottom="8dp" android:text="@string/section_smb"
+            android:textAppearance="?attr/textAppearanceTitleMedium"/>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_host">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbHost"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textUri" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_port">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbPort"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="number" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_share">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbShare"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="text|textNoSuggestions" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_path">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbPath"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="text|textNoSuggestions" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_domain">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbDomain"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="text|textNoSuggestions" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/smb_user">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbUser"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="text|textNoSuggestions" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent"
+                android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:hint="@string/password" app:endIconMode="password_toggle">
+                <com.google.android.material.textfield.TextInputEditText android:id="@+id/edtSmbPass"
+                    android:layout_width="match_parent" android:layout_height="wrap_content"
+                    android:inputType="textPassword" android:maxLines="1"/>
+            </com.google.android.material.textfield.TextInputLayout>
+            <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swSmbSigning"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/smb_signing"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" android:text="@string/smb_signing_desc"
+                android:textAppearance="?attr/textAppearanceBodySmall"/>
+            <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swSmbEncrypt"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/smb_encrypt"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" android:text="@string/smb_encrypt_desc"
+                android:textAppearance="?attr/textAppearanceBodySmall"/>
+            <com.google.android.material.materialswitch.MaterialSwitch android:id="@+id/swSmbDfs"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:text="@string/smb_dfs"/>
+            <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" android:text="@string/smb_dfs_desc"
+                android:textAppearance="?attr/textAppearanceBodySmall"/>
+            <TextView android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" android:text="@string/smb_auth_note"
+                android:textAppearance="?attr/textAppearanceBodySmall"/>
+        </LinearLayout>
 
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" android:text="@string/section_output"
+            android:layout_marginTop="8dp" android:layout_marginBottom="8dp" android:text="@string/section_output"
             android:textAppearance="?attr/textAppearanceTitleMedium"/>
         <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
             android:text="@string/format"/>

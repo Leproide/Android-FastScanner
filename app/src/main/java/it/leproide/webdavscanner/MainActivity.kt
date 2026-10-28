@@ -1,5 +1,5 @@
 /*
- * WebDAV Scanner
+ * FastScanner
  * Copyright (C) 2026
  * Author: https://github.com/Leproide
  *
@@ -50,7 +50,7 @@ import java.util.Locale
 import java.util.UUID
 
 /**
- * Main screen: two actions.
+ * Main screen: two actions (upload to WebDAV or SMB, chosen in settings).
  *  - Single: ML Kit scanner limited to 1 page -> "Fine" -> upload, no prompts.
  *  - Multi:  ML Kit scanner, unlimited pages -> "Fine" -> upload, no prompts.
  * File name = <prefix>yyyy-MM-dd_HH-mm-ss (seconds included, never overwritten).
@@ -98,8 +98,8 @@ class MainActivity : AppCompatActivity() {
         super.onResume()
         val cfg = Prefs.load(this)
         txtTarget.text = if (cfg.isConfigured) {
-            getString(R.string.target, runCatching { WebDavClient.buildBaseUrl(cfg).toString() }
-                .getOrDefault(cfg.server))
+            getString(R.string.target, runCatching { Uploader.describe(cfg) }
+                .getOrDefault(cfg.server.ifBlank { cfg.smbHost }))
         } else getString(R.string.not_configured)
     }
 
